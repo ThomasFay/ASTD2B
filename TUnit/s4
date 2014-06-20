@@ -1,0 +1,25 @@
+(MAIN,<*;
+
+      (AUT1,<
+             aut;
+             { (A1->elem),
+               (A2->elem),
+               (A3->elem)
+             };
+             { ((local,A1,A2),Emprunter,{},False),
+               ((local,A2,A3),Rendre,{},False),
+               ((local,A3,A1),Reinit,{},False)
+             };
+             { 
+               A3
+             };
+             { 
+
+             };
+             A1
+           >
+      )
+
+
+    >
+)

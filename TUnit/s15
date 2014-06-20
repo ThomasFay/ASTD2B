@@ -1,0 +1,90 @@
+
+(USE,<|[]|:;
+      x;
+      [1,10];
+      {};
+      (USE2,<|[]|:;
+             y;
+             [1,10];
+             {};
+             (USE3,<*;
+                    (USE4 , <aut;
+                             { (A1->elem),
+                               (A2->elem),
+                               (A3->elem)
+                             };
+                             { ((local,A1,A2),Emprunter(x,y),{},False),
+                               ((local,A2,A3),Rendre(x),{},False)
+                             };
+                             { 
+                              A3
+                             };
+                             { 
+                             };
+                             A1
+                            >
+                    )
+                   >
+             )
+            >
+      )
+     >
+
+);
+
+
+
+
+(MAIN,<|[]|;
+        {Emprunter,Rendre};
+        (USER,<call;
+                USE;
+                {}
+               >
+        );
+        (CREATOR,<call;
+                CRE;
+                {}
+               >
+        )
+       >
+);
+
+
+
+
+(CRE,<|[]|:;
+      x;
+      [1,10];
+      {};
+      (CRE2,<*;
+              (CRE3,<|:;
+                      y;
+                      [1,10];
+                      (CRE4,<*;
+                             (CRE5 , <aut;
+                                      { (A1->elem),
+                                        (A2->elem),
+                                        (A3->elem)
+                                      };
+                                      { ((local,A1,A2),Emprunter(x,y),{},False),
+                                        ((local,A2,A3),Rendre(x),{},False)
+                                      };
+                                      { 
+                                       A3
+                                      };
+                                      { 
+                                      };
+                                      A1
+                                    >
+                             )
+                            >
+                      )
+                     >
+              )
+             >
+      )
+     >
+)
+
+

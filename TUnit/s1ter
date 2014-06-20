@@ -1,0 +1,47 @@
+
+
+(MAIN,<
+       aut;
+       { (A1->elem),
+         (A2->elem),
+         (A3-><
+	 aut;
+	   {(A31-> elem),
+	    (A32-><
+	    aut;
+	       {(A321-> elem),
+	        (A322-> elem)
+	       };
+	       {((local,A321,A322),Toto,{},False)
+	       };
+	       {
+	           A322
+	       };
+	       {
+	       };
+	       A321
+	     >)
+	    
+	   };
+	   {((local,A31,A32),Rendre,{},False)
+	   };
+	   {
+	   };
+	   {
+	      A32
+	   };
+	   A31
+	   >)
+       };
+       { ((local,A1,A2),Emprunter,{},False),
+         ((local,A2,A3),Rendre,{},False),
+         ((local,A3,A1),Reinit,{},True)
+       };
+       { 
+         A3
+       };
+       { 
+       };
+       A1
+      >
+)

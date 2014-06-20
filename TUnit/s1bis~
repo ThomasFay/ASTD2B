@@ -1,0 +1,33 @@
+
+
+(MAIN,<
+       aut;
+       { (A1->elem),
+         (A2->elem),
+         (A3-><
+	 aut;
+	   {(A31-> elem),
+	    (A32-> elem)
+	   };
+	   {((local,A31,A32),Rendre,{},False)
+	   };
+	   {
+	      A32
+	   };
+	   {
+	   };
+	   A31
+	   >)
+       };
+       { ((local,A1,A2),Emprunter,{},False),
+         ((local,A2,A3),Rendre,{},False),
+         ((local,A3,A1),Reinit,{},False)
+       };
+       { 
+         A3
+       };
+       { 
+       };
+       A1
+      >
+)

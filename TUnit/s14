@@ -1,0 +1,61 @@
+(MAIN , <aut; 
+         {
+          (A8->elem),
+          (NIV2-> <aut;
+                   { (A6->elem),
+                     (NIV1 -> <aut;
+                               { (A1->elem),
+                                 (A2->elem),
+                                 (A3->elem),
+                                 (A4->elem),
+                                 (A5->elem)
+                               };
+                               { ((local,A1,A2),Transun,{},False),
+                                 ((local,A2,A3),Transdeux,{},False),
+                                 ((local,A3,A4),Transtrois,{},False),
+                                 ((local,A4,A5),Transquatre,{},False),
+                                 ((local,A5,A1),Reinit,{},True)
+                               };
+                               { 
+                                 A5
+                               };
+                               { 
+                               };
+                               A1
+                              >
+                     ),
+                     (A7->elem)
+                   };
+                   {
+                     ((local,A6,NIV1),First,{},False),
+                     ((local,NIV1,A7),Fromsubgen,{},True),
+                     ((local,A7,A6),Restart,{},False),
+                     ((from_sub,A3,A7,NIV1),Fromsub,{},False),
+                     ((to_sub,A7,H1,NIV1),Toshallowhist,{},False)
+                   };
+                   {
+                     A7
+                   };
+                   {
+                   };
+                   A6
+                  >
+          ) ,
+          (A9->elem)
+         };
+         {
+                     ((local,A8,NIV2),Firstbis,{},False),
+                     ((local,NIV2,A9),Fromsubgenbis,{},False),
+                     ((local,A9,A8),Restartbis,{},False),
+                     ((from_sub,NIV1,A9,NIV2),Fromsubbis,{},True),
+                     ((to_sub,A9,H2,NIV2),Todeephist,{},False),
+                     ((to_sub,A9,H1,NIV2),Toshallowhistbis,{},False)
+         };
+         {
+           A9
+         };
+         {
+         };
+         A8
+        >
+)

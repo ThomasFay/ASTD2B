@@ -1,0 +1,40 @@
+(MAIN,<*;
+
+	(CHOICE0,<|;
+	       (AUT1,<aut;
+	              { (A1->elem),
+	                (A2->elem),
+	                (A3->elem)
+	              };
+	              { ((local,A1,A2),Emprunter,{},False),
+	                ((local,A2,A3),Rendre,{},False),
+	                ((local,A3,A1),Reinit,{},False)
+	              };
+	              { 
+	                A3
+	              };
+	              { 
+	              };
+	                A1
+	             >);
+	       (AUT2,<aut;
+	              { (A4->elem),
+	                (A5->elem),
+	                (A6->elem)
+	              };
+	              { ((local,A4,A5),Emprunter,{},False),
+	                ((local,A5,A6),Rendre,{},False),
+	                ((local,A6,A4),Reinit,{},False)
+	              };
+	              { 
+	                A6
+	              };
+	              { 
+	              };
+	                A4
+ 	           >)
+ 	     >)
+
+
+    >
+)
