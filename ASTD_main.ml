@@ -5,7 +5,7 @@ let rstarting_choice_possible = ref false
 let rplace_to_read = ref "TUnit/"
 let rbdd = ref false
 let rwait = ref false
-let rdebug = ref false
+let rdebug = ref true
 let rsFile = ref ""
 let riFile = ref ""
 

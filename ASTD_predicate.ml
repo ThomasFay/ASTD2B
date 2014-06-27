@@ -1,15 +1,20 @@
 type name = string 
 
-type t = name * ASTD_term.params
+type t = IASTDPredicate of name * ASTD_term.params
+	 | BPredicate of string
 
 exception ASTD_free_variable of ASTD_term.t * t
 
 let _ASTD_predicate_definition_table_ = Hashtbl.create 5 
 
-let predicate name params = (name,params)
+let predicate name params = IASTDPredicate (name,params)
 
-let get_name = fst
-let get_params = snd
+let get_name iastd = match iastd with
+  |IASTDPredicate (na,par) -> na
+  |_ -> failwith "This Predicate has no name"
+let get_params iastd = match iastd with
+  |IASTDPredicate (na,par) -> par
+  |_ -> failwith "This Predicate has no name"
 
 let register = Hashtbl.add _ASTD_predicate_definition_table_ 
 let get = Hashtbl.find _ASTD_predicate_definition_table_ 
@@ -26,7 +31,7 @@ let evaluate p env =
            in d
            end
     with ASTD_term.ASTD_not_a_constant term
-         -> raise (ASTD_free_variable (term,(name,params)))
+         -> raise (ASTD_free_variable (term,IASTDPredicate (name,params)))
 
 let estimate p env =
     let name = get_name p
@@ -41,7 +46,7 @@ let estimate p env =
                                                 else pred e
            end
     with ASTD_term.ASTD_not_a_constant term
-         -> raise (ASTD_free_variable (term,(name,params)))
+         -> raise (ASTD_free_variable (term,IASTDPredicate (name,params)))
 
 
 let print_name n = print_string n

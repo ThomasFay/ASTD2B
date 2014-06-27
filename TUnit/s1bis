@@ -9,7 +9,7 @@
 	   {(A31-> elem),
 	    (A32-> elem)
 	   };
-	   {((local,A31,A32),Rendre,{},False)
+	   {((local,A31,A32),Rendre,{"toto : in"},False)
 	   };
 	   {
 	      A32
@@ -19,9 +19,9 @@
 	   A31
 	   >)
        };
-       { ((local,A1,A2),Emprunter,{},False),
-         ((local,A2,A3),Rendre,{},False),
-         ((local,A3,A1),Reinit,{},True)
+       { ((local,A1,A2),Emprunter,{""},False),
+         ((local,A2,A3),Rendre,{""},False),
+         ((local,A3,A1),Reinit,{""},True)
        };
        { 
          A3

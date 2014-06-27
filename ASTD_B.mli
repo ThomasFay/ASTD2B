@@ -4,10 +4,12 @@ type bSet =
 
 type predicateB =
   Equality of bSet * bSet
+| BPred of string
 | And of predicateB * predicateB
 | Or of predicateB * predicateB
 | In of bSet * bSet
 | True
+
 | Implies of predicateB * predicateB;;
 
 type substitutionB =

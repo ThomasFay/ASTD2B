@@ -21,6 +21,7 @@
 %}  
 
 %token <string> BOOL
+%token <string> B_PREDICATE
 %token <string> IDENTITY_NAME
 %token <string> STRING_VALUE
 %token <int>    INT_VALUE
@@ -35,6 +36,7 @@
 %token REMOVE LOCAL FROM_SUB TO_SUB
 %token UNDERSCORE
 %token EOF
+%token QUOTE
 
 %nonassoc QINTERLEAVE QSYNCHRO QCHOICE
 %right PARALLEL INTERLEAVE SYNCHRO
@@ -285,6 +287,10 @@ list_of_predicates :
         (ASTD_predicate.predicate "none" (ASTD_term.parameters_of_variables []))::[]   }   
     | LSET list_of_predicates_content RSET
       {$2}
+    | LSET B_PREDICATE RSET
+      {(ASTD_predicate.BPredicate (String.sub $2 1 ((String.length $2) - 2)))::[]}
+    | LSET QUOTE QUOTE RSET
+	{[]}
     ;
 
 

@@ -1,7 +1,8 @@
 (** ASTD predicate module *)
 
 type name = string
-type t = name * ASTD_term.params
+type t = |IASTDPredicate of name * ASTD_term.params
+	 |BPredicate of string
 
 exception ASTD_free_variable of ASTD_term.t * t
 

@@ -4,6 +4,7 @@ type bSet =
 
 type predicateB =
   Equality of bSet * bSet
+| BPred of string
 | And of predicateB * predicateB
 | Or of predicateB * predicateB
 | In of bSet * bSet
@@ -33,7 +34,7 @@ type machineB = {
 
 let rec indent n = match n with
   |0 -> ""
-  |n -> "    " ^ indent (n-1);;
+  |n -> "   " ^ indent (n-1);;
 
 let rec printValList valList = match valList with
   |[] -> ""
@@ -64,7 +65,8 @@ let rec printPredicateB pred n = match pred with
   |And (expr1,expr2) -> "(" ^ (printPredicateB expr1 n) ^ " /\\ \n" ^ (printPredicateB expr2 n) ^ ")"
   |Or (expr1,expr2) ->  "(" ^ (printPredicateB expr1 n) ^ " \\/ \n" ^ (printPredicateB expr2 n) ^ ")"
   |In (set1,set2) -> indent n ^ printBSet set1 ^ " : " ^ printBSet set2
-  |True -> "True"
+  |True -> indent n ^ "True"
+  |BPred str -> indent n ^ str
   |Implies (pred1,pred2) -> "(" ^ printPredicateB pred1 n ^ " =>\n" ^ printPredicateB pred2 (n+1) ^ ")";;
 
 
@@ -74,12 +76,12 @@ let rec printSubstitution sub n= match sub with
   |Affectation (bSet1,bSet2) -> indent n ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
   |Select [] -> failwith "it shouldn't exist"
   |Select [(pred,sub)] -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+1) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^ indent n ^ "END\n"
-  |Select ((pred,sub)::t) -> "SELECT\n" ^ printPredicateB pred (n+1) ^ "\nTHEN\n" ^ printSubstitution sub (n+1) ^ printStringList (List.rev_map (print1SelectCase (n+1)) t) ^ indent n ^ "END\n"
+  |Select ((pred,sub)::t) -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+1) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^ printStringList (List.rev_map (print1SelectCase (n+1)) t) ^ indent n ^ "END\n"
   |Parallel [] -> failwith "it shouldn't appenned"
   |Parallel [t] -> printSubstitution t n ^ "\n"
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
 and print1SelectCase n ca = let pred,sub = ca
-			  in "WHEN\n" ^  (printPredicateB pred (n+1)) ^ "\nTHEN" ^ printSubstitution sub (n+1) ^ "END\n";;
+			  in indent n ^ "WHEN\n" ^  (printPredicateB pred (n+1)) ^ "\n" ^  indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^indent n^ "END\n";;
 
 let printOperation ope = indent 1 ^ ope.nameOf ^ begin
   let param = printParam ope.parameter in
