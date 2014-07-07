@@ -1,5 +1,6 @@
 type bSet =
   Variable of string
+| Constant of string
 | EnumerateSet of string list;;
 
 type predicateB =
@@ -58,6 +59,7 @@ let rec printParam parameter = match parameter with
 
 let rec printBSet bSet = match bSet with
   |Variable s -> s
+  |Constant s -> s
   |EnumerateSet l -> "{" ^ printValList l ^ "}";;
 
 let rec printPredicateB pred n = match pred with

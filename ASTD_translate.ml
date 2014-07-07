@@ -97,7 +97,7 @@ let rec final astd = match astd with
     |[],[] -> failwith "No Final State"
     |t::q,[] -> ASTD_B.In(ASTD_B.Variable ("State_" ^ name),
 			  ASTD_B.EnumerateSet sFinal)
-    |[],t::q -> And(ASTD_B.In(ASTD_B.Variable ("State_"^name),
+    |[],t::q -> ASTD_B.And(ASTD_B.In(ASTD_B.Variable ("State_"^name),
 			      ASTD_B.EnumerateSet dFinal),
 		    dFinalStateCond dFinal astd)
     |t1::q1,t2::q2 -> (ASTD_B.Or(ASTD_B.In(ASTD_B.Variable ("State_" ^ name),
@@ -251,6 +251,75 @@ let rec addOperationFromTransitionList astd transition_list opeList = match tran
 	   (merge astd (ASTD_arrow.get_label_transition h) hOperationList hTransitionList)::
 	     (addOperationFromTransitionList astd otherTransitionList otherOpeList);;
 
+let rec initValueOfVar var1 listVar =
+  let name = match var1 with
+    |ASTD_B.Constant str -> str
+    |ASTD_B.Variable str -> str
+    |ASTD_B.EnumerateSet li -> failwith "Not a Proper Variable"
+  in
+  match listVar with
+  |[] -> name
+  |(nameVar,typeList,valueVar)::t -> if nameVar = name then valueVar else initValueOfVar (Variable name) t
+
+let rec initPred pred listVar = match pred with
+  |ASTD_B.And (pred1,pred2) -> ASTD_B.And (initPred pred1 listVar,initPred pred2 listVar)
+  |ASTD_B.Or (pred1,pred2) -> ASTD_B.Or (initPred pred1 listVar ,initPred pred2 listVar)
+  |ASTD_B.BPred s -> BPred s
+  |ASTD_B.Equality (var1,val1) -> ASTD_B.Equality (ASTD_B.Constant (initValueOfVar var1 listVar), val1)
+  |ASTD_B.In (var1,val1) -> ASTD_B.In (ASTD_B.Constant (initValueOfVar var1 listVar), val1)
+  |ASTD_B.True -> ASTD_B.True
+  |ASTD_B.Implies (pred1,pred2) -> ASTD_B.Implies (initPred pred1 listVar,initPred pred2 listVar)
+
+let rec initSub sub listVar = match sub with
+  |ASTD_B.Affectation (_,_) -> sub
+  |ASTD_B.Select listSelect -> ASTD_B.Select (initSubSelectList listSelect listVar)
+  |ASTD_B.Parallel listPara -> ASTD_B.Parallel (initSubParaList listPara listVar)
+and initSubSelectList listSelect listVar = match listSelect with
+  |[] -> []
+  |(gu,post)::t -> (initPred gu listVar,initSub post listVar)::(initSubSelectList t listVar)
+and initSubParaList listPara listVar = match listPara with
+  |[] -> []
+  |head::tail -> (initSub head listVar) :: (initSubParaList tail listVar)
+
+let createPrePostSeq opeFst lOpeSnd name astdFst varList= match lOpeSnd with
+  |h1::h2::t -> failwith "Shouln't Happend"
+  |[] ->
+    let pre1 = (ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), 
+					     ASTD_B.Variable "fst"), 
+			    opeFst.ASTD_B.preOf )) in
+    (pre1,
+     ASTD_B.Select [(pre1,opeFst.ASTD_B.postOf)])
+  |[nameSnd,opeSnd] -> 
+    let pre1,pre2,pre3 = (ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), 
+						       ASTD_B.Variable "fst"), 
+				      opeFst.ASTD_B.preOf ),
+			  ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+						       ASTD_B.Variable "snd"),
+				      ASTD_B.And (final astdFst,initPred opeSnd.ASTD_B.preOf varList)), 
+			  ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+						       ASTD_B.Variable "snd"),
+				      opeSnd.ASTD_B.preOf))
+    in
+    (ASTD_B.Or(ASTD_B.Or (pre1,pre2),pre3),
+     ASTD_B.Select [(pre1,opeFst.ASTD_B.postOf);
+		    (pre2,ASTD_B.Parallel [(ASTD_B.Affectation (ASTD_B.Variable ("State_ " ^ name),
+								ASTD_B.Constant "snd"));
+					   initSub (opeSnd.ASTD_B.postOf) varList]);
+		    (pre3,opeSnd.ASTD_B.postOf)])
+
+let rec modifyOperationForSequence listFst listSnd name astdFst varList = match (listFst,listSnd) with
+  |[],[] -> []
+  |[],listSnd -> listSnd
+  |((hFst::tFst),listSnd) ->
+    let (nameFst,opeFst) = hFst in
+    let opeFstList,opeNonFst = seperateOperation opeFst.ASTD_B.nameOf listSnd in 
+    let pre,post = createPrePostSeq opeFst opeFstList name astdFst varList in
+    (name,{ASTD_B.nameOf = opeFst.ASTD_B.nameOf;
+	   ASTD_B.parameter = opeFst.ASTD_B.parameter;
+	   ASTD_B.preOf=pre;
+	   ASTD_B.postOf=post})::(modifyOperationForSequence tFst opeNonFst name astdFst varList)
+
+    
 let rec addEnuerateSetToSetList nameOfSet valueListOfSet setList = match setList with
   |[] -> [nameOfSet,valueListOfSet]
   |(name,values)::t -> if name = nameOfSet then setList else (name,values)::(addEnuerateSetToSetList nameOfSet valueListOfSet t);;
@@ -264,7 +333,7 @@ let rec translate_aux astd = match astd with
   |ASTD_astd.Sequence (name,astdFst,astdSnd) ->
     let setListFst,varListFst,opeListFst = translate_aux astdFst in
     let setListSnd,varListSnd,opeListSnd = translate_aux astdSnd in
-    ((addEnuerateSetToSetList "SequenceState" ["fst";"snd"] setListSnd),varListSnd,opeListSnd)
+    ((addEnuerateSetToSetList "SequenceState" ["fst";"snd"] (setListSnd@setListFst)),("State_"^name,["SequenceState"],"fst")::(varListFst@varListSnd),(modifyOperationForSequence opeListFst opeListSnd name astdFst (varListFst@varListSnd)))
 and translateStateList stateList nameTranslatedAstd = match stateList with
   |h::t -> let (setListOfH,varListOfH,opeListOfH) = translate_aux h in
 	   let (setListOfT,varListOfT,opeListOfT) = translateStateList t nameTranslatedAstd

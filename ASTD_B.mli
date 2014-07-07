@@ -1,5 +1,6 @@
 type bSet =
   Variable of string
+| Constant of string
 | EnumerateSet of string list;;
 
 type predicateB =
