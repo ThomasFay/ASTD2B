@@ -1,7 +1,7 @@
 {
     open ASTD_parser_rules ;;
  
-    let ebs_lexer_debug = true ;;
+    let ebs_lexer_debug = false ;;
     let ebs_lexer_msg m = if (ebs_lexer_debug) 
                            then print_endline m 
                            else ignore m;;

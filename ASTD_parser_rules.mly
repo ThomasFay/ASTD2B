@@ -61,27 +61,27 @@
 structure:
      |structure SCOLON astd LSET domain_list RSET
       { astd_parser_msg ("structure 1st choice");
-        print_endline "========================================" ;
-        ASTD_astd.global_save_astd $3 $5 ;
-        print_endline ("Registered: "^(ASTD_astd.get_name $3)) 
+        (*print_endline "========================================" ;*)
+        ASTD_astd.global_save_astd $3 $5 (*;
+        print_endline ("Registered: "^(ASTD_astd.get_name $3)) *)
       }
      |astd LSET domain_list RSET
       { astd_parser_msg ("structure 2nd choice");
-        print_endline "========================================" ;
-        ASTD_astd.global_save_astd $1 $3 ;
-        print_endline ("Registered: "^(ASTD_astd.get_name $1)) 
+        (*print_endline "========================================" ;*)
+        ASTD_astd.global_save_astd $1 $3 (*;
+        print_endline ("Registered: "^(ASTD_astd.get_name $1)) *)
       }
      |structure SCOLON astd 
       { astd_parser_msg ("structure 1st choice");
-        print_endline "========================================" ;
-        ASTD_astd.global_save_astd $3 [] ;
-        print_endline ("Registered: "^(ASTD_astd.get_name $3)) 
+        (*print_endline "========================================" ;*)
+        ASTD_astd.global_save_astd $3 [](* ;
+        print_endline ("Registered: "^(ASTD_astd.get_name $3)) *)
       }
      |astd 
       { astd_parser_msg ("structure 2nd choice");
-        print_endline "========================================" ;
-        ASTD_astd.global_save_astd $1 [] ;
-        print_endline ("Registered: "^(ASTD_astd.get_name $1)) 
+        (*print_endline "========================================" ;*)
+        ASTD_astd.global_save_astd $1 [](* ;
+        print_endline ("Registered: "^(ASTD_astd.get_name $1)) *)
       }
   ;
 

@@ -64,8 +64,8 @@ let rec printBSet bSet = match bSet with
 
 let rec printPredicateB pred n = match pred with
   |Equality (set1,set2) -> indent n ^ printBSet set1 ^ " = " ^ printBSet set2
-  |And (expr1,expr2) -> "(" ^ (printPredicateB expr1 n) ^ " /\\ \n" ^ (printPredicateB expr2 n) ^ ")"
-  |Or (expr1,expr2) ->  "(" ^ (printPredicateB expr1 n) ^ " \\/ \n" ^ (printPredicateB expr2 n) ^ ")"
+  |And (expr1,expr2) -> "(" ^ (printPredicateB expr1 n) ^ " & \n" ^ (printPredicateB expr2 n) ^ ")"
+  |Or (expr1,expr2) ->  "(" ^ (printPredicateB expr1 n) ^ " or \n" ^ (printPredicateB expr2 n) ^ ")"
   |In (set1,set2) -> indent n ^ printBSet set1 ^ " : " ^ printBSet set2
   |True -> indent n ^ "True"
   |BPred str -> indent n ^ str
@@ -83,7 +83,7 @@ let rec printSubstitution sub n= match sub with
   |Parallel [t] -> printSubstitution t n ^ "\n"
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
 and print1SelectCase n ca = let pred,sub = ca
-			  in indent n ^ "WHEN\n" ^  (printPredicateB pred (n+1)) ^ "\n" ^  indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^indent n^ "END\n";;
+			  in indent n ^ "WHEN\n" ^  (printPredicateB pred (n+1)) ^ "\n" ^  indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^indent n^ "\n";;
 
 let printOperation ope = indent 1 ^ ope.nameOf ^ begin
   let param = printParam ope.parameter in
@@ -130,6 +130,6 @@ let rec printOperationList li = match li with
   |h::t -> printOperation h ^ ";\n\n" ^ printOperationList t;;
 
 let rec print_machine ma = begin
-  "MACHINE\n" ^ indent 1 ^ ma.machine ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ "INVARIANTS\n" ^ printInv ma.invariants ^ "INITIALISATION\n" ^ printInit ma.initialisation ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
+  "MACHINE\n" ^ indent 1 ^ ma.machine ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ "INVARIANT\n" ^ printInv ma.invariants ^ "INITIALISATION\n" ^ printInit ma.initialisation ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
 end;;
 

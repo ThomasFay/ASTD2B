@@ -5,9 +5,9 @@
 	        (A2->elem),
 	        (A3->elem)
 	      };
-	      { ((local,A1,A2),Emprunter,{},False),
-	        ((local,A2,A3),Rendre,{},False),
-	        ((local,A3,A1),Reinit,{},False)
+	      { ((local,A1,A2),Emprunter,{""},False),
+	        ((local,A2,A3),Rendre,{""},False),
+	        ((local,A3,A1),Reinit,{""},False)
 	      };
 	      { 
 	        A3
@@ -22,9 +22,9 @@
 	        (A5->elem),
 	        (A6->elem)
 	      };
-	      { ((local,A4,A5),Empruntern,{},False),
-	        ((local,A5,A6),Rendre,{},False),
-	        ((local,A6,A4),Reinit,{},False)
+	      { ((local,A4,A5),Empruntern,{""},False),
+	        ((local,A5,A6),Rendre,{""},False),
+	        ((local,A6,A4),Reinit,{""},False)
 	      };
 	      { 
 	        A6
