@@ -281,15 +281,17 @@ and initSubParaList listPara listVar = match listPara with
   |[] -> []
   |head::tail -> (initSub head listVar) :: (initSubParaList tail listVar)
 
-let createPrePostSeq opeFst lOpeSnd name astdFst varList= match lOpeSnd with
-  |h1::h2::t -> failwith "Shouln't Happend"
-  |[] ->
+let createPrePostSeq lOpeFst lOpeSnd name astdFst varList= match (lOpeFst,lOpeSnd) with
+  |_,h1::h2::t -> failwith "Shouln't Happend"
+  |h1::h2::t,_ -> failwith "Shouln't Happend"
+  |[],[] -> failwith "Shouldn't Happend"
+  |[(nameFst,opeFst)],[] ->
     let pre1 = (ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), 
 					     ASTD_B.Variable "fst"), 
 			    opeFst.ASTD_B.preOf )) in
     (pre1,
      ASTD_B.Select [(pre1,opeFst.ASTD_B.postOf)])
-  |[nameSnd,opeSnd] -> 
+  |[nameFst,opeFst],[nameSnd,opeSnd] -> 
     let pre1,pre2,pre3 = (ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), 
 						       ASTD_B.Variable "fst"), 
 				      opeFst.ASTD_B.preOf ),
@@ -306,14 +308,34 @@ let createPrePostSeq opeFst lOpeSnd name astdFst varList= match lOpeSnd with
 								ASTD_B.Constant "snd"));
 					   initSub (opeSnd.ASTD_B.postOf) varList]);
 		    (pre3,opeSnd.ASTD_B.postOf)])
+  |[],[nameSnd,opeSnd] ->
+    let pre2,pre3 = (
+      ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+				   ASTD_B.Variable "snd"),
+		  ASTD_B.And (final astdFst,initPred opeSnd.ASTD_B.preOf varList)), 
+      ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+				   ASTD_B.Variable "snd"),
+		  opeSnd.ASTD_B.preOf))
+    in
+    (ASTD_B.Or(pre2,pre3),
+     ASTD_B.Select [(pre2,ASTD_B.Parallel [(ASTD_B.Affectation (ASTD_B.Variable ("State_ " ^ name),
+								ASTD_B.Constant "snd"));
+					   initSub (opeSnd.ASTD_B.postOf) varList]);
+		    (pre3,opeSnd.ASTD_B.postOf)])
 
 let rec modifyOperationForSequence listFst listSnd name astdFst varList = match (listFst,listSnd) with
   |[],[] -> []
-  |[],listSnd -> listSnd
+  |[],(hSnd::tSnd) -> 
+    let (nameSnd,opeSnd) = hSnd in
+    let pre,post = createPrePostSeq [] [hSnd] name astdFst varList in
+    (name,{ASTD_B.nameOf = opeSnd.ASTD_B.nameOf;
+	   ASTD_B.parameter = opeSnd.ASTD_B.parameter;
+	   ASTD_B.preOf=pre;
+	   ASTD_B.postOf=post})::(modifyOperationForSequence listFst tSnd name astdFst varList)   
   |((hFst::tFst),listSnd) ->
     let (nameFst,opeFst) = hFst in
     let opeFstList,opeNonFst = seperateOperation opeFst.ASTD_B.nameOf listSnd in 
-    let pre,post = createPrePostSeq opeFst opeFstList name astdFst varList in
+    let pre,post = createPrePostSeq [hFst] opeFstList name astdFst varList in
     (name,{ASTD_B.nameOf = opeFst.ASTD_B.nameOf;
 	   ASTD_B.parameter = opeFst.ASTD_B.parameter;
 	   ASTD_B.preOf=pre;
