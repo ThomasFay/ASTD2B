@@ -178,24 +178,6 @@ list_of_params_scheme_content :
     | IDENTITY_NAME
       { astd_parser_msg ("List of params "); 
         (ASTD_term.Var(ASTD_variable.of_string $1))::[]  }
-    | STRING_VALUE COMMA list_of_params_scheme_content
-      { astd_parser_msg ("List of params "); 
-        (ASTD_term.Const(ASTD_constant.Symbol($1)))::$3 }
-    | STRING_VALUE
-      { astd_parser_msg ("List of params "); 
-        (ASTD_term.Const(ASTD_constant.Symbol($1)))::[]  }
-    | INT_VALUE COMMA list_of_params_scheme_content
-      { astd_parser_msg ("List of params "); 
-        (ASTD_term.Const(ASTD_constant.of_int ($1)))::$3 }
-    | INT_VALUE
-      { astd_parser_msg ("List of params "); 
-        (ASTD_term.Const(ASTD_constant.of_int ($1)))::[]  }
-    | UNDERSCORE COMMA list_of_params_scheme_content
-      { astd_parser_msg ("List of params "); 
-        (ASTD_term.Const(ASTD_constant.Symbol("ANY VALUE")))::$3 }
-    | UNDERSCORE
-      { astd_parser_msg ("List of params "); 
-        (ASTD_term.Const(ASTD_constant.Symbol("ANY VALUE")))::[]  }
     ;
 
 
@@ -347,8 +329,8 @@ astd_synchronisation :
 
 
 astd_qchoice :
-    | BEGIN_ASTD CHOICE COLON SCOLON IDENTITY_NAME SCOLON complex_val_construction SCOLON astd END_ASTD
-      { ASTD_astd.qchoice_of (ASTD_astd.give_name ()) (ASTD_variable.of_string $5) ($7) [] $9  }
+    | BEGIN_ASTD CHOICE COLON SCOLON IDENTITY_NAME SCOLON STRING_VALUE SCOLON astd END_ASTD
+      { ASTD_astd.qchoice_of (ASTD_astd.give_name ()) (ASTD_variable.of_string $5) ((String.sub $7 1 ((String.length $7) - 2))) [] $9  }
     ;
 
 
@@ -358,7 +340,7 @@ complex_val_construction :
     |string_val_construction
       { $1 }
     |val_construction REMOVE val_construction
-      { astd_parser_msg "Suppression from domain" ; ASTD_constant.remove_domain_from $3 $1 }       
+      { astd_parser_msg "Suppression from domain" ; ASTD_constant.remove_domain_from $3 $1 }
     ;
 
 

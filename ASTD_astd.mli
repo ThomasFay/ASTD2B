@@ -23,10 +23,10 @@ type t = Automata of astd_name * t list * ASTD_arrow.t list * astd_name list* as
     | Synchronisation of astd_name * ASTD_label.t list * t * t
 (**The synchronisation structure, represented by the name of the astd, the list of synchronized transitions and the two sub astd of the structure*)
 
-    | QChoice of astd_name * ASTD_variable.t * ASTD_constant.domain * ASTD_optimisation.dependency list * t 
+    | QChoice of astd_name * ASTD_variable.t * string * t 
 (**The quantified choice structure, represented by the name of the astd, the quantified variable, its domain of value and the sub astd*)
 
-    | QSynchronisation of astd_name * ASTD_variable.t * ASTD_constant.domain * ASTD_label.t list * ASTD_optimisation.optimisation list * t     
+    | QSynchronisation of astd_name * ASTD_variable.t * ASTD_constant.domain * ASTD_label.t list * t     
 (**The quantified synchronisation structure, represented by the name of the astd, the quantified variable, her domain of value, the list of synchronized transitions, and the sub astd*)
 
     | Guard of astd_name * ASTD_predicate.t list * t
@@ -50,7 +50,7 @@ val sequence_of : astd_name -> t -> t -> t
 val choice_of : astd_name -> t -> t -> t
 val kleene_of : astd_name -> t -> t
 val synchronisation_of : astd_name -> ASTD_label.t list -> t -> t -> t
-val qchoice_of : astd_name -> ASTD_variable.t -> ASTD_constant.domain ->ASTD_optimisation.dependency list -> t -> t
+val qchoice_of : astd_name -> ASTD_variable.t -> string -> 'a -> t -> t
 val qsynchronisation_of : astd_name -> ASTD_variable.t -> ASTD_constant.domain -> ASTD_label.t list -> ASTD_optimisation.optimisation list-> t -> t
 val guard_of : astd_name -> ASTD_predicate.t list -> t -> t
 val call_of : astd_name -> astd_name -> ((ASTD_variable.t *ASTD_term.t) list )-> t
@@ -76,7 +76,7 @@ val get_trans_synchronised : t -> ASTD_label.t list
 val get_synchro_astd1 : t -> t
 val get_synchro_astd2 : t -> t
 val get_qvar : t -> ASTD_variable.t
-val get_qvalues_c : t -> ASTD_constant.domain
+val get_qvalues_c : t -> string
 val get_qvalues_s : t -> ASTD_constant.domain
 val get_qastd : t -> t
 val get_guard_pred : t -> ASTD_predicate.t list

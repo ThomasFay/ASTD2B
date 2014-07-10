@@ -28,6 +28,7 @@ type set = Set_of.t
 type value = | Range of (int * int)
              | Val of t
              | FreeVal
+	     | FreeSet of string
 
 
 

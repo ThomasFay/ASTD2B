@@ -10,12 +10,18 @@ type predicateB =
 | Or of predicateB * predicateB
 | In of bSet * bSet
 | True
-| Implies of predicateB * predicateB;;
+| False
+| Implies of predicateB * predicateB
+| Exists of string * predicateB;;
 
 type substitutionB =
   Select of (predicateB * substitutionB) list
 | Affectation of bSet * bSet
 | Parallel of substitutionB list;;
+
+type initialisation =
+| AffectationInit of bSet * bSet
+| AnyInit of string * predicateB * bSet * bSet
 
 type operation = {
   nameOf : string;
@@ -29,9 +35,20 @@ type machineB = {
   sets : (string * (string list)) list;
   variables : string list;
   invariants : (string * (string list)) list;
-  initialisation : (string * (string list) * string) list;
+  init : initialisation list;
   operations : operation list;
 }
+
+let rec predMap fon pred = match pred with
+  |Equality (bSet1,bSet2) -> Equality(fon bSet1, fon bSet2)
+  |BPred str -> BPred str
+  |And (pred1,pred2) -> And(predMap fon pred1,predMap fon pred2)
+  |Or (pred1,pred2) -> Or(predMap fon pred1,predMap fon pred2)
+  |In (bSet1,bSet2) -> In (fon bSet1, fon bSet2)
+  |True -> True
+  |False -> False
+  |Implies (pred1,pred2) -> Implies (predMap fon pred1,predMap fon pred2)
+  |Exists (str,pred1) -> Exists (str,predMap fon pred1)
 
 let rec indent n = match n with
   |0 -> ""
@@ -69,7 +86,9 @@ let rec printPredicateB pred n = match pred with
   |In (set1,set2) -> indent n ^ printBSet set1 ^ " : " ^ printBSet set2
   |True -> indent n ^ "True"
   |BPred str -> indent n ^ str
-  |Implies (pred1,pred2) -> "(" ^ printPredicateB pred1 n ^ " =>\n" ^ printPredicateB pred2 (n+1) ^ ")";;
+  |Implies (pred1,pred2) -> "(" ^ printPredicateB pred1 n ^ " =>\n" ^ printPredicateB pred2 (n+1) ^ ")"
+  |Exists (variable,pred) -> "#" ^ variable ^ "(" ^ printPredicateB pred n ^ ")"
+  |False -> indent n ^ "False"
 
 
   
@@ -78,7 +97,7 @@ let rec printSubstitution sub n= match sub with
   |Affectation (bSet1,bSet2) -> indent n ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
   |Select [] -> failwith "it shouldn't exist"
   |Select [(pred,sub)] -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+1) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^ indent n ^ "END\n"
-  |Select ((pred,sub)::t) -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+1) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^ printStringList (List.rev_map (print1SelectCase (n+1)) t) ^ indent n ^ "END\n"
+  |Select ((pred,sub)::t) -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+1) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+1) ^ printStringList (List.rev_map (print1SelectCase n) t) ^ indent n ^ "END\n"
   |Parallel [] -> failwith "it shouldn't appenned"
   |Parallel [t] -> printSubstitution t n ^ "\n"
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
@@ -114,15 +133,22 @@ let rec printInitTypage typage value = match typage with
   |[] -> "{" ^ value ^ "}"
   |h::t -> h ^ "* {" ^ printInitTypage t value ^ "}"
 
-let rec printInit init = match init with
+let rec printInit initList = match initList with
   |[] -> ""
-  |[(var,typage,value)] -> if typage = [] 
-    then indent 1 ^ var ^ " := " ^ value
-    else indent 1 ^ var ^ " := " ^ printInitTypage typage value
-  |(var,typage,value)::t ->  let varPrint = if typage = [] 
-    then indent 1 ^ var ^ " := " ^ value
-    else indent 1 ^ var ^ " := " ^ printInitTypage typage value
-		       in varPrint ^ " ||\n" ^ printInit t
+  |[init] ->
+    begin
+      match init with
+      |AffectationInit (bSet1,bSet2) -> printBSet bSet1 ^ " := " ^ printBSet bSet2
+      |AnyInit (var,pred,bSet1,bSet2) -> "ANY " ^ var ^ " WHERE " ^ printPredicateB pred 1 ^ " THEN " ^ printBSet bSet1 ^ " := " ^ printBSet bSet2 ^ " END\n"
+    end
+  |(init)::t ->
+    let initPrint =
+    begin
+      match init with
+      |AffectationInit (bSet1,bSet2) -> printBSet bSet1 ^ " := " ^ printBSet bSet2
+      |AnyInit (var,pred,bSet1,bSet2) -> "ANY " ^ var ^ " WHERE " ^ printPredicateB pred 1 ^ " THEN "^ printBSet bSet1 ^ " := " ^ printBSet bSet2 ^ " END\n"
+    end in
+    initPrint ^ " ||\n" ^ printInit t;;
 
 let rec printOperationList li = match li with
   |[] -> ""
@@ -130,6 +156,6 @@ let rec printOperationList li = match li with
   |h::t -> printOperation h ^ ";\n\n" ^ printOperationList t;;
 
 let rec print_machine ma = begin
-  "MACHINE\n" ^ indent 1 ^ ma.machine ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ "INVARIANT\n" ^ printInv ma.invariants ^ "INITIALISATION\n" ^ printInit ma.initialisation ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
+  "MACHINE\n" ^ indent 1 ^ ma.machine ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ "INVARIANT\n" ^ printInv ma.invariants ^ "INITIALISATION\n" ^ printInit ma.init ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
 end;;
 

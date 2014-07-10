@@ -121,6 +121,7 @@ let string_of_set = create_string_of_set fold_set string_of
 type value = | Range of (int * int)
              | Val of t
              | FreeVal
+	     | FreeSet of string
 
 
 let compare_val c1 c2 = match (c1,c2) with

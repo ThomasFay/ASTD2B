@@ -1,15 +1,15 @@
 (MAIN,<*;
         (QCH0,<|:;
-               x;
-               [1,10]-{7};
+               xx;
+               "Tx";
                (AUT1 , <aut;
                         { (A1->elem),
                           (A2->elem),
                           (A3->elem)
                         };
-                        { ((local,A1,A2),Emprunter(x),{},False),
-                          ((local,A2,A3),Rendre(x),{},False),
-                          ((local,A3,A1),Reinit(x),{},False)
+                        { ((local,A1,A2),Emprunter(xx),{""},False),
+                          ((local,A2,A3),Rendre(xx),{""},False),
+                          ((local,A3,A1),Reinit(xx),{""},False)
                         };
                         { 
                           A3
