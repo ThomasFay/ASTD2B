@@ -1,16 +1,16 @@
 (MAIN,<*;
         (QSYN0,<|[]|:;
-               x;
-               [1,5]-{3};
-               {  };
+               xx;
+               "Tx";
+               {Reinit };
                (AUT1 , <aut;
                         { (A1->elem),
                           (A2->elem),
                           (A3->elem)
                         };
-                        { ((local,A1,A2),Emprunter(x),{[isGreaterThanOne (x)]},False),
-                          ((local,A2,A3),Rendre(x),{[isGreaterThanOne (x)]},False),
-                          ((local,A3,A1),Reinit,{},False)
+                        { ((local,A1,A2),Emprunter(xx),{""},False),
+                          ((local,A2,A3),Rendre(xx),{""},False),
+                          ((local,A3,A1),Reinit,{""},False)
                         };
                         { 
                           A3

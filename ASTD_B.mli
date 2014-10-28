@@ -1,7 +1,9 @@
 type bSet =
   Variable of string
 | Constant of string
-| EnumerateSet of string list;;
+| Function of string * (string list)
+| EnumerateSet of string list
+| CartesianP of string list
 
 type predicateB =
   Equality of bSet * bSet
@@ -12,12 +14,16 @@ type predicateB =
 | True
 | False
 | Implies of predicateB * predicateB
-| Exists of string * predicateB;;
+| Exists of string * predicateB
+| Forall of string * predicateB * predicateB
 
 type substitutionB =
   Select of (predicateB * substitutionB) list
 | Affectation of bSet * bSet
-| Parallel of substitutionB list;;
+| Parallel of substitutionB list
+| AffectationLambda of string * (string * predicateB * string) list
+| Call of string * (string list)
+| Any of string * predicateB * substitutionB
 
 type initialisation =
 | AffectationInit of bSet * bSet
@@ -30,9 +36,22 @@ type operation = {
   postOf : substitutionB;
 }
 
+type typeOfMachine =
+  |Machine of string
+  |Refinement of string * string
+
+type seesMachine =
+  |SeenMachine of string
+  |NoSeenMachine
+
+type includesMachine =
+  |IncludedMachine of string
+  |NoIncludedMachine
 
 type machineB = {
-  machine : string;
+  machine : typeOfMachine;
+  sees : seesMachine;
+  includes : includesMachine;
   sets : (string * (string list)) list;
   variables : string list;
   invariants : (string * (string list)) list;
@@ -44,4 +63,8 @@ val predMap : (bSet -> bSet) -> predicateB -> predicateB
 
 val print_machine : machineB -> string
 
+val strOfValue : bSet -> string
 
+val simplifyPred : predicateB -> predicateB
+
+val simplifySub : substitutionB -> substitutionB

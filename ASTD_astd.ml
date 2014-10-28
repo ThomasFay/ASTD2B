@@ -59,7 +59,7 @@ type t = Automata of astd_name * t list * ASTD_arrow.t list * astd_name list * a
     | Kleene of astd_name * t
     | Synchronisation of astd_name * ASTD_label.t list * t * t
     | QChoice of astd_name * ASTD_variable.t * string * t
-    | QSynchronisation of astd_name * ASTD_variable.t * ASTD_constant.domain * ASTD_label.t list * t 
+    | QSynchronisation of astd_name * ASTD_variable.t * string * ASTD_label.t list * t 
     | Guard of astd_name * ASTD_predicate.t list * t
     | Call of astd_name * astd_name * (ASTD_variable.t *ASTD_term.t) list 
     | Elem of astd_name

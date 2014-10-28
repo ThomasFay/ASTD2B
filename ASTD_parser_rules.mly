@@ -26,7 +26,7 @@
 %token <string> STRING_VALUE
 %token <int>    INT_VALUE
 %token LAMBDA AUTOMATA ELEM BEGIN_ASTD END_ASTD CALL TRUE FALSE
-%token SEQUENCE CHOICE PARALLEL INTERLEAVE
+%token SEQUENCE CHOICE PARALLEL INTERLEAVE FORK
 %token LSYNCHRO RSYNCHRO
 %token LENV RENV GUARD
 %token KLEENE PLUS QMARK
@@ -303,7 +303,6 @@ list_of_params_content :
         (ASTD_variable.of_string $1)::[]  }
     ;
 
-
 astd_sequence :
     | BEGIN_ASTD SEQUENCE SCOLON astd SCOLON astd END_ASTD
       { ASTD_astd.sequence_of (ASTD_astd.give_name ()) $4 $6 }
@@ -394,8 +393,8 @@ string_list_content :
 
 
 astd_qsynchro :
-    | BEGIN_ASTD LSYNCHRO RSYNCHRO COLON SCOLON IDENTITY_NAME SCOLON complex_val_construction SCOLON list_of_labels SCOLON astd END_ASTD
-      {ASTD_astd.qsynchronisation_of (ASTD_astd.give_name ()) $6 ($8) $10 [] $12 }
+    | BEGIN_ASTD LSYNCHRO RSYNCHRO COLON SCOLON IDENTITY_NAME SCOLON STRING_VALUE SCOLON list_of_labels SCOLON astd END_ASTD
+      {ASTD_astd.qsynchronisation_of (ASTD_astd.give_name ()) $6 ((String.sub $8 1 ((String.length $8) - 2))) $10 [] $12 }
     ;
 
 

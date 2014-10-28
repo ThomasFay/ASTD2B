@@ -1,5 +1,6 @@
 exception NotFound of string;;
 exception InitIsAny of ASTD_B.predicateB;;
+exception TrueGuard of ASTD_B.substitutionB;;
 
 (*
   This operation adds the state nameOfTheState to the set nameOfTheStateSet in the setList.
@@ -62,6 +63,7 @@ let rec seperateTransition name transition_list = match transition_list with
 let rec getAstdFromName name astd = match astd with
   |ASTD_astd.Elem nameElem -> if nameElem = name then astd else raise (NotFound name)
   |ASTD_astd.Automata (nameAut,stateList,_,_,_,_)-> if nameAut = name then astd else getAstdFromStateList name stateList
+  |ASTD_astd.Kleene(nameKle,subAstd) -> if nameKle = name then astd else getAstdFromName name subAstd
 and getAstdFromStateList name stateList = match stateList with
   |[] -> raise (NotFound name)
   |h::t -> try getAstdFromName name h with
@@ -78,13 +80,21 @@ let rec initializeAllVariable nameOfState astd =
   let initialAstd = getAstdFromName nameOfState astd in match initialAstd with
     |ASTD_astd.Elem _ -> []
     |ASTD_astd.Automata (name,_,_,_,_,init) -> (ASTD_B.Affectation (ASTD_B.Variable ("State_" ^ name),
-								    ASTD_B.Variable init))::(initializeAllVariable init astd);;
+								    ASTD_B.Constant init))::(initializeAllVariable init astd)
+    |ASTD_astd.Kleene(name,subAstd) -> (ASTD_B.Affectation (ASTD_B.Variable("State_" ^ name),
+							    ASTD_B.Constant "notStarted"))::(initializeAllVariable (ASTD_astd.get_name subAstd) astd);;
+
+let rec lastElem li = match li with
+  |[] -> failwith "Empty list : no last elem"
+  |[t] -> t
+  |h::t -> lastElem t
 
 let rec initValueOfVar listVar var1 =
   let name = match var1 with
     |ASTD_B.Constant str -> str
     |ASTD_B.Variable str -> str
     |ASTD_B.EnumerateSet li -> failwith "Not a Proper Variable"
+    |ASTD_B.Function (name,param) -> name
   in
   match listVar with
   |[] -> name
@@ -97,35 +107,141 @@ let rec initValueOfVar listVar var1 =
 	    match var2 with
 	    | ASTD_B.Constant str -> str
 	    | ASTD_B.Variable str -> failwith "initializing a Variable with a variable"
+	    | ASTD_B.CartesianP li ->  lastElem li
 	    | _ -> failwith "Unbound initial Value"
 	  end
 	| AnyInit (var,pred,_,_) -> raise (InitIsAny pred)
       end
     else initValueOfVar t (Variable name)
 
-let rec initPred pred listVar = match pred with
-  |ASTD_B.And (pred1,pred2) -> ASTD_B.And (initPred pred1 listVar,initPred pred2 listVar)
-  |ASTD_B.Or (pred1,pred2) -> ASTD_B.Or (initPred pred1 listVar ,initPred pred2 listVar)
+
+
+let rec initPredSimpl pred listVar = match pred with
+  |ASTD_B.And (pred1,pred2) ->
+    let initPredSimpl1 = initPredSimpl pred1 listVar and
+	initPredSimpl2 = initPredSimpl pred2 listVar in
+(*    ASTD_B.And (initPredSimpl1,initPredSimpl2)*)
+   begin
+      match initPredSimpl1,initPredSimpl2 with
+      |(ASTD_B.False,_) -> ASTD_B.False
+      |(ASTD_B.True,_) -> initPredSimpl2
+      |(_,ASTD_B.True) -> initPredSimpl1
+      |(_,ASTD_B.False) -> ASTD_B.False
+      |(_,_) -> ASTD_B.And (initPredSimpl1, initPredSimpl2)
+    end
+
+(*    let initPredSimpl1 = initPredSimpl pred1 listVar in
+    begin
+      match initPredSimpl1 with
+      |ASTD_B.True -> initPredSimpl pred2 listVar
+      |ASTD_B.False -> ASTD_B.False
+      |_ -> let initPredSimpl2 = initPredSimpl pred2 listVar in
+	    begin
+	      match initPredSimpl2 with
+	      |ASTD_B.True -> initPredSimpl1
+	      |ASTD_B.False -> ASTD_B.False
+	      |_ -> ASTD_B.And (initPredSimpl1,initPredSimpl2)
+	    end
+    end*)
+  |ASTD_B.Or (pred1,pred2) ->
+    let initPredSimpl1 = initPredSimpl pred1 listVar and
+	initPredSimpl2 = initPredSimpl pred2 listVar in
+    begin
+      match initPredSimpl1,initPredSimpl2 with
+     |(ASTD_B.True,_) -> ASTD_B.True
+      |(ASTD_B.False,_) -> initPredSimpl2
+      |(_,ASTD_B.False) -> initPredSimpl1
+      |(_,ASTD_B.True) -> ASTD_B.True
+      |(_,_) -> ASTD_B.Or (initPredSimpl1, initPredSimpl2)
+    end
   |ASTD_B.BPred s -> BPred s
   |ASTD_B.Equality (var1,val1) ->
     begin
       try
-	let value = initValueOfVar listVar var1
-	in ASTD_B.Equality (ASTD_B.Constant value, val1)
+	let value1 = initValueOfVar listVar var1
+	and value2 = ASTD_B.strOfValue val1 in
+	if value1 = value2 then ASTD_B.True else ASTD_B.False
       with
       | InitIsAny pred -> pred
     end
   |ASTD_B.In (var1,val1) -> ASTD_B.In (ASTD_B.Constant (initValueOfVar listVar var1), val1)
   |ASTD_B.True -> ASTD_B.True
-  |ASTD_B.Implies (pred1,pred2) -> ASTD_B.Implies (initPred pred1 listVar,initPred pred2 listVar)
+  |ASTD_B.Implies (pred1,pred2) -> ASTD_B.Implies (initPredSimpl pred1 listVar,initPredSimpl pred2 listVar)
+  |ASTD_B.False -> ASTD_B.False
+  |ASTD_B.Exists(var,predicate) -> 
+    let initPredicate = initPredSimpl predicate listVar in
+    begin
+      match initPredicate with
+      |ASTD_B.False -> ASTD_B.False
+      |ASTD_B.True -> ASTD_B.True
+      |_ -> ASTD_B.Exists(var, initPredicate)
+    end
+  |ASTD_B.Forall(var,pred1,pred2) ->
+    let initPredicate2 = initPredSimpl pred2 listVar in
+    begin
+      match initPredicate2 with
+      |ASTD_B.False -> ASTD_B.False
+      |ASTD_B.True -> ASTD_B.True
+      |_ -> ASTD_B.Forall (var,
+			   initPredSimpl pred1 listVar,
+			   initPredicate2)
+    end
+let rec initPredBrut pred listVar = match pred with
+  |ASTD_B.And (pred1,pred2) ->
+    let initPredBrut1 = initPredBrut pred1 listVar and
+	initPredBrut2 = initPredBrut pred2 listVar in ASTD_B.And(initPredBrut1,initPredBrut2)
+  |ASTD_B.Or (pred1,pred2) ->
+    let initPredBrut1 = initPredBrut pred1 listVar and
+	initPredBrut2 = initPredBrut pred2 listVar in
+    ASTD_B.Or(initPredBrut1,initPredBrut2)
+  |ASTD_B.BPred s -> BPred s
+  |ASTD_B.Equality (var1,val1) ->
+    begin
+      try
+	let value1 = initValueOfVar listVar var1
+	and value2 = ASTD_B.strOfValue val1 in
+	ASTD_B.Equality(ASTD_B.Constant value1,ASTD_B.Constant value2)
+      with
+      | InitIsAny pred -> pred
+    end
+  |ASTD_B.In (var1,val1) -> ASTD_B.In (ASTD_B.Constant (initValueOfVar listVar var1), val1)
+  |ASTD_B.True -> ASTD_B.True
+  |ASTD_B.Implies (pred1,pred2) -> ASTD_B.Implies (initPredBrut pred1 listVar,initPredBrut pred2 listVar)
+  |ASTD_B.False -> ASTD_B.False
+
+let initPred pred listVar = initPredSimpl pred listVar
+
+let initPredAffectationLambdaElement listVar elem =
+  let str1,pred,str2 = elem in
+  str1,(initPred pred listVar),str2
 
 let rec initSub sub listVar = match sub with
   |ASTD_B.Affectation (_,_) -> sub
-  |ASTD_B.Select listSelect -> ASTD_B.Select (initSubSelectList listSelect listVar)
+  |ASTD_B.Select listSelect -> begin
+			       try ASTD_B.Select (initSubSelectList listSelect listVar) with
+			       |TrueGuard sub -> sub
+			     end
   |ASTD_B.Parallel listPara -> ASTD_B.Parallel (initSubParaList listPara listVar)
+  |ASTD_B.Call _ -> sub
+  |ASTD_B.Any(string, pred, substit) ->
+    let initSubstit = initSub substit listVar in
+    begin
+      match initSubstit with
+      |Select [] -> Select []
+      |_ -> ASTD_B.Any (string , initPred pred listVar, initSubstit)
+    end
+  |ASTD_B.AffectationLambda (var,li) -> ASTD_B.AffectationLambda (var,List.rev_map (initPredAffectationLambdaElement listVar) li)
+ (* ASTD_B.Any (string,initPred pred listVar, initSub substit listVar) *)
+
 and initSubSelectList listSelect listVar = match listSelect with
   |[] -> []
-  |(gu,post)::t -> (initPred gu listVar,initSub post listVar)::(initSubSelectList t listVar)
+  |(gu,post)::t -> let initGu = initPred gu listVar in
+		   begin
+		     match initGu with
+		     |ASTD_B.True -> raise (TrueGuard (initSub post listVar))
+		     |ASTD_B.False -> initSubSelectList t listVar
+		     |_ -> (initGu,initSub post listVar)::(initSubSelectList t listVar)
+		   end
 and initSubParaList listPara listVar = match listPara with
   |[] -> []
   |head::tail -> (initSub head listVar) :: (initSubParaList tail listVar)
@@ -133,6 +249,12 @@ and initSubParaList listPara listVar = match listPara with
 let replaceVariable str1 str2 bSet = match bSet with 
   |ASTD_B.Variable var -> if var = str1 then ASTD_B.Variable str2 else bSet
   |_ -> bSet
+
+let quantifiedVariable param bSet = match bSet with
+  |ASTD_B.Constant c -> bSet
+  |ASTD_B.Variable v -> Function (v,[param])
+  |ASTD_B.Function (v,paramList) -> Function (v,param::paramList)
+  |ASTD_B.EnumerateSet _ -> bSet
 
 (*
   This operation returns the B predicate that verifies if the ASTD "astd" is final
@@ -176,7 +298,7 @@ let rec final astd listVar = match astd with
 			    ASTD_B.Implies (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
 							     ASTD_B.Constant "rightS"),
 					    final astdRight listVar)))
-  |ASTD_astd.Kleene(name,subAstd) -> ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+  |ASTD_astd.Kleene(name,subAstd) -> ASTD_B.Or (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
 								  ASTD_B.Constant "notStarted"),
 						 final subAstd listVar)
   |ASTD_astd.Synchronisation (name,labelList,astdLeft,astdRight) ->
@@ -192,13 +314,15 @@ let rec final astd listVar = match astd with
 		ASTD_B.Implies (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
 						 ASTD_B.Constant "chosen"),
 				ASTD_B.predMap (replaceVariable var "vv") (final subAstd listVar)))
+  |ASTD_astd.QSynchronisation(name,var,domain,_,subAstd) ->
+    Forall(var,(In(Variable var,Constant domain)),ASTD_B.predMap (quantifiedVariable var) (final subAstd listVar))
 and dFinalStateCond dFinal astd listVar = match dFinal with
   |[] -> failwith "No DFinal State"
   |[t] -> ASTD_B.Implies (ASTD_B.Equality(ASTD_B.Variable ("State_" ^ (ASTD_astd.get_name astd)),
-					  ASTD_B.Variable t),
+					  ASTD_B.Constant t),
 			  final (getAstdFromName t astd) listVar)
   |t::q -> ASTD_B.And(ASTD_B.Implies (ASTD_B.Equality(ASTD_B.Variable ("State_" ^ (ASTD_astd.get_name astd)),
-						      ASTD_B.Variable t),
+						      ASTD_B.Constant t),
 				      final (getAstdFromName t astd) listVar),
 		      dFinalStateCond q astd listVar);;
 
@@ -243,7 +367,6 @@ let transformTransition translatedAstd listVar transition=
 	 in
 	 let gu = translatePredicateList astdPredicate in
 	 if gu = ASTD_B.True then preOf
-
 	 else ASTD_B.And(preOf,gu)),
      let tAll = (ASTD_B.Affectation (ASTD_B.Variable ("State_" ^ name),
 				     ASTD_B.Constant toState))
@@ -300,7 +423,12 @@ let rec getPreOf subList = match subList with
 
 
 
-let transformSubOperation name elem = let (name1,operation) = elem in (ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),ASTD_B.Variable name1),operation.ASTD_B.preOf),operation.ASTD_B.postOf);;
+let transformSubOperation name elem = 
+  let (name1,operation) = elem in
+  (ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+				ASTD_B.Constant name1),
+	       operation.ASTD_B.preOf),
+   operation.ASTD_B.postOf);;
 
 (*
   This operation transform the list of transition in operations, and merges it with the list of allready translated operations. It takes 5 arguments :
@@ -486,10 +614,21 @@ let rec modifyOperationForChoice listLeft listRight name astdLeft varList = matc
 let rec modifyOperationsForKleene listOpe name subAstd varList = match listOpe with
   |[] -> []
   |(nameOpe,opeOpe)::t ->
-    let pre1 = ASTD_B.And (ASTD_B.Or (final subAstd varList,
-				      ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
-						       ASTD_B.Constant "notStarted")),
-			   initPred (opeOpe.ASTD_B.preOf) varList) and
+    let pre1 = let initPreOf = initPred (opeOpe.ASTD_B.preOf) varList and
+		   finalSub = ASTD_B.Or (final subAstd varList,
+					 ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+							  ASTD_B.Constant "notStarted"))
+	       in
+	       begin
+		 match initPreOf with
+		 |ASTD_B.True -> finalSub
+		 |_-> ASTD_B.And(finalSub,initPreOf)
+	       end and
+
+      (* ASTD_B.And (ASTD_B.Or (final subAstd varList, *)
+      (* 				      ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), *)
+      (* 						       ASTD_B.Constant "notStarted")), *)
+      (* 			   initPred (opeOpe.ASTD_B.preOf) varList) and *)
 	pre2 = ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
 					    ASTD_B.Constant "started"),
 			   opeOpe.ASTD_B.preOf) in
@@ -499,8 +638,8 @@ let rec modifyOperationsForKleene listOpe name subAstd varList = match listOpe w
 			      pre2, opeOpe.ASTD_B.postOf] in
     (name,{ASTD_B.nameOf = opeOpe.ASTD_B.nameOf;
 	   ASTD_B.parameter = opeOpe.ASTD_B.parameter;
-	   ASTD_B.preOf = ASTD_B.Or (pre1,pre2);
-	   ASTD_B.postOf = post})::(modifyOperationsForKleene t name subAstd varList);;
+	   ASTD_B.preOf = ASTD_B.simplifyPred (ASTD_B.Or (pre1,pre2));
+	   ASTD_B.postOf = ASTD_B.simplifySub post})::(modifyOperationsForKleene t name subAstd varList);;
 
 let rec isInSyncSet name syncList = match syncList with
   |[] -> false
@@ -571,9 +710,155 @@ let modifyOperationForQChoice name var listVar operation =
 		ASTD_B.preOf = modifiedPreOf;
 		ASTD_B.postOf = modifiedPostOf})
 
+let quantifyLambdaAff var ovl = let (str1,pred,str2)=ovl in (str1,ASTD_B.predMap (quantifiedVariable var) pred,str2)
+
+let rec quantifyPost var sub = match sub with
+  |ASTD_B.Select li -> ASTD_B.Select (List.rev_map (quantifySelectCase var) li)
+  |ASTD_B.Affectation (va1,va2) -> ASTD_B.Affectation (quantifiedVariable var va1,quantifiedVariable var va2)
+  |ASTD_B.Parallel li -> ASTD_B.Parallel (List.rev_map (quantifyPost var) li)
+  |ASTD_B.AffectationLambda (var1,li) -> ASTD_B.AffectationLambda (var1,List.rev_map (quantifyLambdaAff var) li)
+and quantifySelectCase var ca = let (pred,sub) = ca in
+				(ASTD_B.predMap (quantifiedVariable var) pred,quantifyPost var sub)
+
+let quantifiedOpe ope var domain =
+  {ASTD_B.nameOf = ope.ASTD_B.nameOf;
+   ASTD_B.parameter = ope.ASTD_B.parameter;
+   ASTD_B.preOf = ASTD_B.And (ASTD_B.In (Variable var,Constant domain),
+			      ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
+   ASTD_B.postOf = quantifyPost var ope.ASTD_B.postOf}
+
+
+let andPred pred casePred = let (bSet,pred1,sub) = casePred in
+			    match pred1 with
+			    |ASTD_B.True -> (bSet,pred,sub)
+			    |_ ->(bSet,ASTD_B.And (pred,pred1),sub)
+
+let rec getName var = match var with 
+  |ASTD_B.Variable str -> str
+  |ASTD_B.Constant str -> str
+  |_-> failwith "no name"
+
+let rec casePredicate sub = match sub with
+  |ASTD_B.Select li -> casePredicateSelect li
+  |ASTD_B.Affectation (bSet1,bSet2) -> [(getName bSet1,ASTD_B.True,sub)]
+  |ASTD_B.Parallel li -> casePredicatePara li
+and casePredicateSelect li = match li with
+  |[] -> []
+  |(pred,sub)::t -> (List.rev_map (andPred pred) (casePredicate sub)) @ (casePredicateSelect t)
+and casePredicatePara li = match li with
+  |[] -> []
+  |h::t -> casePredicate h @ casePredicatePara t
+
+let rec addVarPreAffect case casePList = match casePList with
+  |[] -> [case]::[]
+  |(h::t)::st -> let (varC,predC,affC) = case and
+      (varH,predH,affH) = h in
+		 if varH = varC then (case::h::t)::st
+		 else (h::t)::(addVarPreAffect case st)
+
+let rec regroupByVariable caseP = match caseP with
+  |[] -> []
+  |h::t -> addVarPreAffect h (regroupByVariable t);;
+
+let makeOvl varQ domainQ case ovl = 
+  let (varC,pred,affect) = case in
+  let (varO,li) = ovl in
+  match affect with
+  |ASTD_B.Affectation (bSet1,bSet2) ->
+    begin
+      match bSet2 with
+      |ASTD_B.Variable st -> (varO,(varQ,ASTD_B.And (In (Constant varQ,Constant domainQ),pred),st)::li)
+      |ASTD_B.Constant st -> (varO,(varQ,ASTD_B.And (In (Constant varQ,Constant domainQ),pred),st)::li)
+      |_ -> failwith "bad Affectation"
+    end
+  |_ -> failwith "badSub"
+
+let getVar caseP = match caseP with
+  |[] -> failwith "noVar"
+  |(var,pred,affect)::t -> var
+
+let makeOneOvl varQ domainQ caseP = let varA = getVar caseP in
+  let (var,li) = (List.fold_right (makeOvl varQ domainQ) caseP (varA,[])) in
+  ASTD_B.AffectationLambda (var,li)
+
+let modifyPostOfForQSync post var domain =
+  quantifyPost var (ASTD_B.Parallel (List.rev_map (makeOneOvl (var) domain) (regroupByVariable (casePredicate post))))
+
+let synchroOpe ope var domain =
+  {ASTD_B.nameOf = ope.ASTD_B.nameOf;
+   ASTD_B.parameter = ope.ASTD_B.parameter;
+   ASTD_B.preOf = Forall(var,
+			 In (Variable var, Constant domain),
+			 ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
+   ASTD_B.postOf = modifyPostOfForQSync ope.ASTD_B.postOf var domain}
+
+let rec isAParameter var params = match params with
+  |[] -> false
+  |t::q -> if t=var then true else isAParameter var q
+
+let anyOpe ope var domain =
+  let predicate = ASTD_B.And(ASTD_B.In (Variable var, Constant domain),
+			     ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf)
+  in
+  {ASTD_B.nameOf = ope.ASTD_B.nameOf;
+   ASTD_B.parameter = ope.ASTD_B.parameter;
+   ASTD_B.preOf = 
+     ASTD_B.Exists(var,predicate);
+   ASTD_B.postOf = ASTD_B.Any(var,
+			      predicate,
+			      quantifyPost var ope.ASTD_B.postOf);}
+
+let modifyOperationForQSync syncSet var domain ope = 
+  let (name,ope) = ope in
+  if isInSyncSet ope.ASTD_B.nameOf syncSet then
+    (name,synchroOpe ope var domain)
+  else
+    if (isAParameter var ope.parameter)
+    then
+      (name,quantifiedOpe ope var domain)
+    else
+      (name,anyOpe ope var domain)
+
+(*match listOpe with
+  |[] -> []
+  |(name,ope)::opeListTail ->
+    if isInSyncSet ope.ASTD_B.nameOf syncSet then
+      (name,synchroOpe ope var domain)::(modifyOperationForQSync opeListTail syncSet var domain)
+    else
+      (name,quantifiedOpe ope var)::(modifyOperationForQSync opeListTail syncSet var domain)
+*)	   
+
 let rec addEnumerateSetToSetList nameOfSet valueListOfSet setList = match setList with
   |[] -> [nameOfSet,valueListOfSet]
   |(name,values)::t -> if name = nameOfSet then setList else (name,values)::(addEnumerateSetToSetList nameOfSet valueListOfSet t);;
+
+let quantifiedInit domain init = match init with
+  |ASTD_B.AffectationInit (bSet1,bSet2) ->
+    let newbSet2 =
+    begin
+      match bSet2 with
+      |ASTD_B.Variable str -> failwith "initialisation with a variable"
+      |ASTD_B.Constant str -> ASTD_B.CartesianP [domain;str]
+      |ASTD_B.Function _ -> failwith "initialisation with a function"
+      |ASTD_B.EnumerateSet _ -> failwith "initialisation with an enumerate set"
+      |ASTD_B.CartesianP li -> ASTD_B.CartesianP (domain::li)
+    end
+    in
+    ASTD_B.AffectationInit(bSet1,newbSet2)
+  |ASTD_B.AnyInit (str,pred,bSet1,bSet2) ->
+    let newbSet2 = 
+    begin
+      match bSet2 with
+      |ASTD_B.Variable str -> failwith "initialisation with a variable"
+      |ASTD_B.Constant str -> ASTD_B.CartesianP [domain;str]
+      |ASTD_B.Function _ -> failwith "initialisation with a function"
+      |ASTD_B.EnumerateSet _ -> failwith "initialisation with an enumerate set"
+      |ASTD_B.CartesianP li -> ASTD_B.CartesianP (domain::li)
+    end
+    in ASTD_B.AnyInit (str,pred,bSet1,newbSet2)
+
+let quantifiedVariableInVarList domain elem = let (var,typ,init) = elem in 
+				     (var,domain::typ,quantifiedInit domain init);;
 
 let rec setListFusion listSet1 listSet2 = match listSet1 with
   |[] -> listSet2
@@ -624,7 +909,7 @@ let rec translate_aux astd = match astd with
      modifyOperationsForSynchro opeListRight opeListLeft syncList name)
   |ASTD_astd.QChoice (name,var,domain,subAstd) ->
     let setList,varList,opeList = translate_aux subAstd in
-    (addEnumerateSetToSetList "QChoiceSet" ["chosen";"notchosen"] setList,
+    (addEnumerateSetToSetList domain [] (addEnumerateSetToSetList "QChoiceSet" ["chosen";"notChosen"] setList),
      (("State_" ^ name,
        ["QChoiceSet"],
        AffectationInit (Variable ("State_" ^ name),
@@ -638,8 +923,11 @@ let rec translate_aux astd = match astd with
 		   Variable "xx"))::
 	 varList),
      List.rev_map (modifyOperationForQChoice name var varList) opeList)
-(*  |ASTD_astd.QSynchronisation(name,var,domain,syncSetList,subAstd) ->*)
-    
+  |ASTD_astd.QSynchronisation(name,var,domain,syncSetList,subAstd) ->
+    let setList,varList,opeList = translate_aux subAstd in
+    (setList,
+     List.rev_map (quantifiedVariableInVarList domain) varList,
+     List.rev_map (modifyOperationForQSync syncSetList var domain) opeList)
 and translateStateList stateList nameTranslatedAstd = match stateList with
   |h::t -> let (setListOfH,varListOfH,opeListOfH) = translate_aux h in
 	   let (setListOfT,varListOfT,opeListOfT) = translateStateList t nameTranslatedAstd
@@ -651,14 +939,25 @@ let rec getInfoFromVarList varList = match varList with
   |(name,invList,init)::t -> let nameList,invList_list,initList = getInfoFromVarList t in
 			     (name::nameList,((name,invList)::invList_list),init::initList);;
 
+let callOpe op =
+  {ASTD_B.nameOf = op.ASTD_B.nameOf;
+   ASTD_B.parameter = op.ASTD_B.parameter;
+   ASTD_B.preOf = op.ASTD_B.preOf;
+   ASTD_B.postOf =
+     match op.postOf with
+     |ASTD_B.Parallel li -> ASTD_B.Parallel (Call ((op.nameOf ^ "_act"),op.parameter)::li)
+     |_ -> ASTD_B.Parallel [Call ((op.nameOf ^ "_act"),op.parameter);op.postOf];
+  }
 
-let translate astd = let setsList,varList,opeList = translate_aux astd in
-		     let variables,invariants,initialisation=getInfoFromVarList varList in
-		     let machine = {ASTD_B.machine = "MachineName";
-				    ASTD_B.sets = setsList;
-				    ASTD_B.variables = variables;
-				    ASTD_B.invariants = invariants;
-				    ASTD_B.init = initialisation;
-				    ASTD_B.operations = List.rev_map snd opeList} in
-		     ASTD_B.print_machine machine;;
+let translate astd name refine sees includes = let setsList,varList,opeList = translate_aux astd in
+				      let variables,invariants,initialisation=getInfoFromVarList varList in
+				      let machine = {ASTD_B.machine = if refine="" then Machine name else (Refinement (name,refine));
+						     ASTD_B.sees = if sees="" then NoSeenMachine else SeenMachine sees;
+						     ASTD_B.includes = if includes="" then NoIncludedMachine else IncludedMachine includes;
+						     ASTD_B.sets = setsList;
+						     ASTD_B.variables = variables;
+						     ASTD_B.invariants = invariants;
+						     ASTD_B.init = initialisation;
+						     ASTD_B.operations = List.rev_map callOpe (List.rev_map snd opeList)} in
+				      ASTD_B.print_machine machine;;
 

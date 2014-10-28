@@ -1,2 +1,2 @@
 
-val translate : ASTD_astd.t -> string
+val translate : ASTD_astd.t -> string -> string -> string -> string -> string

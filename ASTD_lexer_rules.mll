@@ -15,7 +15,7 @@ let digits = ['0'-'9']
 let id = "Id"
 let underscore='_'
 let quote='"'
-let bchar = "<+" | "<|" | "<<|" | "|>" | "|>>" | ":" | "<:" | "=" | " " | "(" | ")" | "{"
+let bchar = "<+" | "<|" | "<<|" | "|>" | "|>>" | ":" | "<:" | "=" | " " | "(" | ")" | "{" | "$" | "/" | underscore
 
 
 rule token = parse
@@ -31,6 +31,7 @@ rule token = parse
  | "|||" { INTERLEAVE }
  | "||"  { PARALLEL }
  | '|'   { CHOICE }
+ | "/|\\" {FORK}
  | "=>"  { GUARD }
  | "->"  { ebs_lexer_msg "new LINT" ;LINK }
  | "(["  { LENV }

@@ -8,6 +8,10 @@ let rwait = ref false
 let rdebug = ref true
 let rsFile = ref ""
 let riFile = ref ""
+let refinement = ref ""
+let name = ref ""
+let sees = ref ""
+let includes = ref ""
 
 
 let set_to_ref refInt value () = ignore ( refInt := value )
@@ -26,7 +30,11 @@ let arg_spec = [
   "-wait", Arg.Set rwait, "Activates wait before trying to execute new action";
   "-v", Arg.Unit (set_to_ref raffichage 1), "Regular verbose level";
   "-vv", Arg.Unit (set_to_ref raffichage 2), "Intermediate verbose level";
-  "-vvv", Arg.Unit (set_to_ref raffichage 3), "Maximum verbose level";      
+  "-vvv", Arg.Unit (set_to_ref raffichage 3), "Maximum verbose level";
+  "-refinement", Arg.Set_string refinement, "The translated ASTD is a refinement";
+  "-name", Arg.Set_string name, "The name of the B machine";
+  "-sees", Arg.Set_string sees, "The seen machine if there is one";
+  "-includes", Arg.Set_string includes, "The included machine if necessary";
 (*  "-debug", Arg.Unit debug_on , "Activate debug output";      *)
 ]
 
@@ -90,11 +98,15 @@ let get_starting_name (starting_choice_possible) =
 
 
 let _ = Arg.parse arg_spec usage usage_msg;
-  let (affichage,kappa_indirect,print_final, starting_choice_possible, place_to_read, bdd, wait, debug, sFile, iFile) 
-      = (!raffichage,!rkappa_indirect,!rprint_final,!rstarting_choice_possible,!rplace_to_read,!rbdd,!rwait,!rdebug,!rsFile,!riFile) 
+  let (affichage,kappa_indirect,print_final, starting_choice_possible, place_to_read, bdd, wait, debug, sFile, iFile,refine,name,sees,includes)
+      = (!raffichage,!rkappa_indirect,!rprint_final,!rstarting_choice_possible,!rplace_to_read,!rbdd,!rwait,!rdebug,!rsFile,!riFile,!refinement,!name,!sees,!includes)
   in begin if (sFile=="") then get_structure(place_to_read) else get_structure_from_file(place_to_read^sFile) ;
     let structure=ASTD_astd.get_astd (get_starting_name (starting_choice_possible))
-    in print_endline(ASTD_translate.translate structure)
+    in 
+    let
+      nameBFile = (if (name == "") then "MachineName" else name)
+    in
+    print_endline(ASTD_translate.translate structure nameBFile refine sees includes)
   end
 ;;
 
@@ -151,7 +163,7 @@ let _ = Arg.parse arg_spec usage usage_msg;
 							let raw_spec=Lexing.from_string !raw
 							in let small_list= ASTD_parser_rules.apply_event ASTD_lexer_rules.token raw_spec
 							in begin 
-								 let (a,b,c) = ASTD_exec_first_bd.execute_event_list affichage wait (State2DB.db2state "Main") analysed_struct small_list 0.
+p								 let (a,b,c) = ASTD_exec_first_bd.execute_event_list affichage wait (State2DB.db2state "Main") analysed_struct small_list 0.
 								 in begin
 									new_state:= a;
 									reg_time:= b +. !reg_time;
