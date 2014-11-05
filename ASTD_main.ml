@@ -35,7 +35,7 @@ let arg_spec = [
   "-name", Arg.Set_string name, "The name of the B machine";
   "-sees", Arg.Set_string sees, "The seen machine if there is one";
   "-includes", Arg.Set_string includes, "The included machine if necessary";
-(*  "-debug", Arg.Unit debug_on , "Activate debug output";      *)
+  (* "-debug", Arg.Unit debug_on , "Activate debug output"; *)
 ]
 
 let usage_msg = "iASTD : An ASTD interpretor \n"

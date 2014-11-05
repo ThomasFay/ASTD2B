@@ -122,6 +122,8 @@ type_astd:
       { astd_parser_msg ("type_astd qchoice "); $1 }
     | astd_qsynchro
       { astd_parser_msg ("type_astd qsynch "); $1 }
+    | astd_fork
+      { astd_parser_msg ("type_astd fork "); $1 }
     | astd_guard
       { astd_parser_msg ("type_astd guard "); $1 }
     | astd_call
@@ -317,7 +319,8 @@ astd_choice :
 
 astd_kleene :
     | BEGIN_ASTD KLEENE SCOLON astd END_ASTD
-      { ASTD_astd.kleene_of (ASTD_astd.give_name ()) $4  }
+      { astd_parser_msg ("Kleene");
+	ASTD_astd.kleene_of (ASTD_astd.give_name ()) $4  }
     ;
 
 
@@ -390,7 +393,11 @@ string_list_content :
       { Domain.add (ASTD_constant.value_of(ASTD_constant.Symbol ($1))) (Domain.empty) }
     ;
 
-
+astd_fork :
+    | BEGIN_ASTD FORK SCOLON IDENTITY_NAME SCOLON STRING_VALUE SCOLON list_of_predicates SCOLON list_of_labels SCOLON astd END_ASTD
+		 { astd_parser_msg "Fork";
+		   ASTD_astd.fork_of (ASTD_astd.give_name ()) $4 ((String.sub $6 1 ((String.length $6) - 2))) $8 $10 $12}
+    ;
 
 astd_qsynchro :
     | BEGIN_ASTD LSYNCHRO RSYNCHRO COLON SCOLON IDENTITY_NAME SCOLON STRING_VALUE SCOLON list_of_labels SCOLON astd END_ASTD

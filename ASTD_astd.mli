@@ -28,6 +28,7 @@ type t = Automata of astd_name * t list * ASTD_arrow.t list * astd_name list* as
 
     | QSynchronisation of astd_name * ASTD_variable.t * string * ASTD_label.t list * t     
 (**The quantified synchronisation structure, represented by the name of the astd, the quantified variable, her domain of value, the list of synchronized transitions, and the sub astd*)
+    | Fork of astd_name * ASTD_variable.t * string * ASTD_predicate.t list * ASTD_label.t list * t
 
     | Guard of astd_name * ASTD_predicate.t list * t
 (**The guard structure, represented by the name of the astd, a list of predicates and the sub astd *)
@@ -52,6 +53,7 @@ val kleene_of : astd_name -> t -> t
 val synchronisation_of : astd_name -> ASTD_label.t list -> t -> t -> t
 val qchoice_of : astd_name -> ASTD_variable.t -> string -> 'a -> t -> t
 val qsynchronisation_of : astd_name -> ASTD_variable.t -> string -> ASTD_label.t list -> ASTD_optimisation.optimisation list-> t -> t
+val fork_of : astd_name -> ASTD_variable.t -> string -> ASTD_predicate.t list -> ASTD_label.t list -> t -> t
 val guard_of : astd_name -> ASTD_predicate.t list -> t -> t
 val call_of : astd_name -> astd_name -> ((ASTD_variable.t *ASTD_term.t) list )-> t
 val elem_of : astd_name -> t

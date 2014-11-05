@@ -316,6 +316,8 @@ let rec final astd listVar = match astd with
 				ASTD_B.predMap (replaceVariable var "vv") (final subAstd listVar)))
   |ASTD_astd.QSynchronisation(name,var,domain,_,subAstd) ->
     Forall(var,(In(Variable var,Constant domain)),ASTD_B.predMap (quantifiedVariable var) (final subAstd listVar))
+  |ASTD_astd.Fork (name,var,domain,_,predicate,subAstd) ->
+    Forall(var,(In(Variable var,Constant domain)),ASTD_B.predMap (quantifiedVariable var) (final subAstd listVar))
 and dFinalStateCond dFinal astd listVar = match dFinal with
   |[] -> failwith "No DFinal State"
   |[t] -> ASTD_B.Implies (ASTD_B.Equality(ASTD_B.Variable ("State_" ^ (ASTD_astd.get_name astd)),
@@ -432,7 +434,7 @@ let transformSubOperation name elem =
 
 (*
   This operation transform the list of transition in operations, and merges it with the list of allready translated operations. It takes 5 arguments :
-  - name : The name of the current ASTD
+  - astd : The current translated astd
   - nameOperation : The name of the operation
   - hOperationList : The list of operations translated in the subAstd
   - hTransitionList : The transition list of the ASTD labelled with nameOperatoin
@@ -446,7 +448,7 @@ let merge astd nameOperation hOperationList hTransitionList listVar param=
 				  ASTD_B.parameter =param;
 				  ASTD_B.preOf=preOf;
 				  ASTD_B.postOf=ASTD_B.Select subList});;
-
+ 
 let rec toStringParamList param = match param with
   |[] -> []
   |h::t -> match h with
@@ -457,6 +459,18 @@ let rec getParamFromTransition h =
   match h with
   |ASTD_transition.Transition (name,param) -> toStringParamList param
 
+let modifyOperationOfSubAstd astd ope =
+  let name = ASTD_astd.get_name astd in
+  let (nameOpe,opeOpe) = ope in
+  (name,{ASTD_B.nameOf = opeOpe.ASTD_B.nameOf;
+	 ASTD_B.parameter = opeOpe.ASTD_B.parameter;
+	 ASTD_B.preOf = ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+						     ASTD_B.Constant nameOpe),
+				    opeOpe.preOf);
+	 ASTD_B.postOf = ASTD_B.Select [(ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+						     ASTD_B.Constant nameOpe),
+				    opeOpe.preOf),
+					 opeOpe.postOf)]})
 
 (*
   This operation construct the new operation list of the translation. It gives an operation list.
@@ -469,7 +483,7 @@ let rec getParamFromTransition h =
 *)
 
 let rec addOperationFromTransitionList astd transition_list opeList listVar = match transition_list with
-  |[] -> opeList
+  |[] -> List.rev_map (modifyOperationOfSubAstd astd) opeList
   |h::t -> let hOperationList,otherOpeList = 
 	     seperateOperation (ASTD_arrow.get_label_transition h) opeList in
 	   let hTransitionList, otherTransitionList =
@@ -611,35 +625,63 @@ let rec modifyOperationForChoice listLeft listRight name astdLeft varList = matc
 	   ASTD_B.preOf=pre;
 	   ASTD_B.postOf=post})::(modifyOperationForChoice tLeft opeNonLeft name astdLeft varList)
 
-let rec modifyOperationsForKleene listOpe name subAstd varList = match listOpe with
-  |[] -> []
-  |(nameOpe,opeOpe)::t ->
-    let pre1 = let initPreOf = initPred (opeOpe.ASTD_B.preOf) varList and
-		   finalSub = ASTD_B.Or (final subAstd varList,
-					 ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
-							  ASTD_B.Constant "notStarted"))
-	       in
-	       begin
-		 match initPreOf with
-		 |ASTD_B.True -> finalSub
-		 |_-> ASTD_B.And(finalSub,initPreOf)
-	       end and
+let rec modifyOperationForKleene name subAstd varList ope =
+  let (nameOpe,opeOpe) = ope in
+  let pre1 = let initPreOf = initPred (opeOpe.ASTD_B.preOf) varList and
+		 finalSub = ASTD_B.Or (final subAstd varList,
+				       ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+							ASTD_B.Constant "notStarted"))
+	     in
+	     begin
+	       match initPreOf with
+	       |ASTD_B.True -> finalSub
+	       |_-> ASTD_B.And(finalSub,initPreOf)
+	     end and
 
       (* ASTD_B.And (ASTD_B.Or (final subAstd varList, *)
       (* 				      ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), *)
       (* 						       ASTD_B.Constant "notStarted")), *)
       (* 			   initPred (opeOpe.ASTD_B.preOf) varList) and *)
-	pre2 = ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
-					    ASTD_B.Constant "started"),
-			   opeOpe.ASTD_B.preOf) in
-    let post = ASTD_B.Select [pre1, ASTD_B.Parallel [ASTD_B.Affectation (ASTD_B.Variable ("State_" ^ name),
-									 ASTD_B.Constant "started");
-						     initSub (opeOpe.ASTD_B.postOf) varList];
-			      pre2, opeOpe.ASTD_B.postOf] in
-    (name,{ASTD_B.nameOf = opeOpe.ASTD_B.nameOf;
-	   ASTD_B.parameter = opeOpe.ASTD_B.parameter;
-	   ASTD_B.preOf = ASTD_B.simplifyPred (ASTD_B.Or (pre1,pre2));
-	   ASTD_B.postOf = ASTD_B.simplifySub post})::(modifyOperationsForKleene t name subAstd varList);;
+      pre2 = ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
+					  ASTD_B.Constant "started"),
+			 opeOpe.ASTD_B.preOf) in
+  let post = ASTD_B.Select [pre1, ASTD_B.Parallel [ASTD_B.Affectation (ASTD_B.Variable ("State_" ^ name),
+								       ASTD_B.Constant "started");
+						   initSub (opeOpe.ASTD_B.postOf) varList];
+			    pre2, opeOpe.ASTD_B.postOf] in
+  (name,{ASTD_B.nameOf = opeOpe.ASTD_B.nameOf;
+	 ASTD_B.parameter = opeOpe.ASTD_B.parameter;
+	 ASTD_B.preOf = ASTD_B.simplifyPred (ASTD_B.Or (pre1,pre2));
+	 ASTD_B.postOf = ASTD_B.simplifySub post});;
+ (* match listOpe with *)
+ (*  |[] -> [] *)
+ (*  |(nameOpe,opeOpe)::t -> *)
+ (*    let pre1 = let initPreOf = initPred (opeOpe.ASTD_B.preOf) varList and *)
+ (* 		   finalSub = ASTD_B.Or (final subAstd varList, *)
+ (* 					 ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), *)
+ (* 							  ASTD_B.Constant "notStarted")) *)
+ (* 	       in *)
+ (* 	       begin *)
+ (* 		 match initPreOf with *)
+ (* 		 |ASTD_B.True -> finalSub *)
+ (* 		 |_-> ASTD_B.And(finalSub,initPreOf) *)
+ (* 	       end and *)
+
+ (*      (\* ASTD_B.And (ASTD_B.Or (final subAstd varList, *\) *)
+ (*      (\* 				      ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), *\) *)
+ (*      (\* 						       ASTD_B.Constant "notStarted")), *\) *)
+ (*      (\* 			   initPred (opeOpe.ASTD_B.preOf) varList) and *\) *)
+ (* 	pre2 = ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name), *)
+ (* 					    ASTD_B.Constant "started"), *)
+ (* 			   opeOpe.ASTD_B.preOf) in *)
+ (*    let post = ASTD_B.Select [pre1, ASTD_B.Parallel [ASTD_B.Affectation (ASTD_B.Variable ("State_" ^ name), *)
+ (* 									 ASTD_B.Constant "started"); *)
+ (* 						     initSub (opeOpe.ASTD_B.postOf) varList]; *)
+ (* 			      pre2, opeOpe.ASTD_B.postOf] in *)
+ (*    (name,{ASTD_B.nameOf = opeOpe.ASTD_B.nameOf; *)
+ (* 	   ASTD_B.parameter = opeOpe.ASTD_B.parameter; *)
+ (* 	   ASTD_B.preOf = ASTD_B.simplifyPred (ASTD_B.Or (pre1,pre2)); *)
+ (* 	   ASTD_B.postOf = ASTD_B.simplifySub post})::(modifyOperationsForKleene t name subAstd varList);; *)
 
 let rec isInSyncSet name syncList = match syncList with
   |[] -> false
@@ -777,12 +819,38 @@ let getVar caseP = match caseP with
   |[] -> failwith "noVar"
   |(var,pred,affect)::t -> var
 
-let makeOneOvl varQ domainQ caseP = let varA = getVar caseP in
+let makeOneOvl varQ domainQ caseP =
+  let varA = getVar caseP in
   let (var,li) = (List.fold_right (makeOvl varQ domainQ) caseP (varA,[])) in
   ASTD_B.AffectationLambda (var,li)
 
 let modifyPostOfForQSync post var domain =
-  quantifyPost var (ASTD_B.Parallel (List.rev_map (makeOneOvl (var) domain) (regroupByVariable (casePredicate post))))
+  quantifyPost var (ASTD_B.Parallel (List.rev_map (makeOneOvl var domain) (regroupByVariable (casePredicate post))))
+
+let andPredicateAffectationLambdaElement pred1 element =
+  let (str1,pred2,str2) = element in
+  (str1,ASTD_B.And (pred1,pred2),str2)
+
+let makeOvlFork varQ domainQ predicate case ovl = 
+  let (varC,pred,affect) = case in
+  let (varO,li) = ovl in
+  match affect with
+  |ASTD_B.Affectation (bSet1,bSet2) ->
+    begin
+      match bSet2 with
+      |ASTD_B.Variable st -> (varO,(varQ,ASTD_B.And (In (Constant varQ,Constant domainQ),ASTD_B.And(predicate,pred)),st)::li)
+      |ASTD_B.Constant st -> (varO,(varQ,ASTD_B.And (In (Constant varQ,Constant domainQ),ASTD_B.And(predicate,pred)),st)::li)
+      |_ -> failwith "bad Affectation"
+    end
+  |_ -> failwith "badSub"
+
+let makeOneOvlFork varQ domainQ predicate caseP = 
+  let varA = getVar caseP in
+  let (var,li) = (List.fold_right (makeOvlFork varQ domainQ predicate) caseP (varA,[])) in
+  ASTD_B.AffectationLambda (var,li)
+
+let modifyPostOfForFork post var domain predicate =
+  quantifyPost var (ASTD_B.Parallel (List.rev_map (makeOneOvlFork var domain predicate) (regroupByVariable (casePredicate post))))
 
 let synchroOpe ope var domain =
   {ASTD_B.nameOf = ope.ASTD_B.nameOf;
@@ -791,6 +859,16 @@ let synchroOpe ope var domain =
 			 In (Variable var, Constant domain),
 			 ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
    ASTD_B.postOf = modifyPostOfForQSync ope.ASTD_B.postOf var domain}
+
+let synchroOpeFork ope var domain predicate_list =
+  {ASTD_B.nameOf = ope.ASTD_B.nameOf;
+   ASTD_B.parameter = ope.ASTD_B.parameter;
+   ASTD_B.preOf = Forall(var,
+			 ASTD_B.And(In (Variable var, Constant domain),
+				    translatePredicateList predicate_list),
+			 ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
+   ASTD_B.postOf = modifyPostOfForFork ope.ASTD_B.postOf var domain (translatePredicateList predicate_list)}
+			 
 
 let rec isAParameter var params = match params with
   |[] -> false
@@ -813,6 +891,17 @@ let modifyOperationForQSync syncSet var domain ope =
   if isInSyncSet ope.ASTD_B.nameOf syncSet then
     (name,synchroOpe ope var domain)
   else
+    if (isAParameter var ope.parameter)
+    then
+      (name,quantifiedOpe ope var domain)
+    else
+      (name,anyOpe ope var domain)
+
+let modifyOperationForFork syncSet var domain predicate_list ope =
+  let (name,ope) = ope in
+  if isInSyncSet ope.ASTD_B.nameOf syncSet then
+  (name,synchroOpeFork ope var domain predicate_list)
+   else
     if (isAParameter var ope.parameter)
     then
       (name,quantifiedOpe ope var domain)
@@ -900,7 +989,7 @@ let rec translate_aux astd = match astd with
       ["KleeneState"],
       ASTD_B.AffectationInit (ASTD_B.Variable ("State_" ^ name),
 			      ASTD_B.Constant "notStarted"))::varList,
-     modifyOperationsForKleene opeList name subAstd varList)
+     List.rev_map (modifyOperationForKleene name subAstd varList) opeList)
   |ASTD_astd.Synchronisation (name,syncList,astdLeft,astdRight) ->
     let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
 	setListRight,varListRight,opeListRight = translate_aux astdRight in
@@ -928,6 +1017,11 @@ let rec translate_aux astd = match astd with
     (setList,
      List.rev_map (quantifiedVariableInVarList domain) varList,
      List.rev_map (modifyOperationForQSync syncSetList var domain) opeList)
+  |ASTD_astd.Fork(name,var,domain,predicate_list,synchSetList,subAstd) ->
+    let setList,varList,opeList = translate_aux subAstd in
+    (setList,
+     List.rev_map (quantifiedVariableInVarList domain) varList,
+     List.rev_map (modifyOperationForFork synchSetList var domain predicate_list) opeList)
 and translateStateList stateList nameTranslatedAstd = match stateList with
   |h::t -> let (setListOfH,varListOfH,opeListOfH) = translate_aux h in
 	   let (setListOfT,varListOfT,opeListOfT) = translateStateList t nameTranslatedAstd

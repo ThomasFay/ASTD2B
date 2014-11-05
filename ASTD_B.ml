@@ -179,8 +179,8 @@ let rec printPredicateB_aux pred n left = match pred with
 
 let printPredicateB pred n = printPredicateB_aux pred n false;;
   
-let rec printLambdaOvl func ovl = let (var,pred,value) = ovl in
-				  func ^ " <+ %" ^ var ^ ".(" ^ printPredicateB pred 0 ^ " | " ^ value ^ ")"
+let rec printLambdaOvl n func ovl = let (var,pred,value) = ovl in
+				  func ^ "\n" ^ indent n ^ "<+ %" ^ var ^ ".(\n" ^ printPredicateB pred n ^ " | " ^ value ^ ")"
 
 let rec printSubstitution sub n= match sub with
   |Affectation (bSet1,bSet2) -> indent n ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
@@ -190,7 +190,7 @@ let rec printSubstitution sub n= match sub with
   |Parallel [] -> failwith "it shouldn't appenned"
   |Parallel [t] -> printSubstitution t n ^ "\n"
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
-  |AffectationLambda (var, li) ->  var ^ " := " ^ List.fold_left printLambdaOvl var li
+  |AffectationLambda (var, li) ->  indent n ^ var ^ " := " ^ List.fold_left (printLambdaOvl n) var li
   |Call (name,parameters) -> indent n ^ name ^ begin
 						 let param = printParam parameters in
 						 if param = ""
