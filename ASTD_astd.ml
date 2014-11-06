@@ -58,9 +58,10 @@ type t = Automata of astd_name * t list * ASTD_arrow.t list * astd_name list * a
     | Choice of astd_name * t * t 
     | Kleene of astd_name * t
     | Synchronisation of astd_name * ASTD_label.t list * t * t
+    | Fork of astd_name * ASTD_label.t list * ASTD_predicate.t list * t * t
     | QChoice of astd_name * ASTD_variable.t * string * t
     | QSynchronisation of astd_name * ASTD_variable.t * string * ASTD_label.t list * t 
-    | Fork of astd_name * ASTD_variable.t * string * ASTD_predicate.t list * ASTD_label.t list * t
+    | QFork of astd_name * ASTD_variable.t * string * ASTD_predicate.t list * ASTD_label.t list * t
     | Guard of astd_name * ASTD_predicate.t list * t
     | Call of astd_name * astd_name * (ASTD_variable.t *ASTD_term.t) list 
     | Elem of astd_name
@@ -101,8 +102,11 @@ let qchoice_of name var val_list dep a  = QChoice (name,var,val_list,a);;
 let qsynchronisation_of name var val_list transition_list opt a   = 
                                           QSynchronisation (name,var,val_list,transition_list,a);;
 
-let fork_of name var val_list predicate_list transition_list a =
-  Fork (name,var,val_list,predicate_list,transition_list,a)
+let qfork_of name var val_list predicate_list transition_list a =
+  QFork (name,var,val_list,predicate_list,transition_list,a)
+
+let fork_of name transition_list predicate_list a1 a2 =
+  Fork (name,transition_list,predicate_list,a1,a2)
 
 let guard_of name predicate_list a = Guard(name,predicate_list,a);;
 
@@ -125,7 +129,8 @@ let get_name a = match a with
   | Guard (name,_,_) -> name
   | Call  (name,_,_) -> name
   | Elem (name) -> name
-  | Fork (name,_,_,_,_,_) -> name
+  | QFork (name,_,_,_,_,_) -> name
+  | Fork (name,_,_,_,_) -> name
 ;;
 
 
@@ -260,7 +265,8 @@ let rename_astd astd_to_rename namebis = match astd_to_rename with
    |Synchronisation (a,b,c,d) -> Synchronisation (namebis,b,c,d)
    |QChoice (a,b,c,d) -> QChoice (namebis,b,c,d)
    |QSynchronisation (a,b,c,d,f) -> QSynchronisation (namebis,b,c,d,f)
-   |Fork (a,b,c,d,e,f) -> Fork (namebis,b,c,d,e,f)
+   |QFork (a,b,c,d,e,f) -> QFork (namebis,b,c,d,e,f)
+   |Fork(a,b,c,d,e) -> Fork (namebis,b,c,d,e)
    |Guard (a,b,c) -> Guard (namebis,b,c)
    |Call (a,b,c) -> Call (namebis,b,c)
    |Elem(_) -> Elem(namebis)

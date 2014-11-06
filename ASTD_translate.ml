@@ -257,6 +257,29 @@ let quantifiedVariable param bSet = match bSet with
   |ASTD_B.EnumerateSet _ -> bSet
 
 (*
+  This operation Translate the list of predicate in the guard of the ASTD into a B predicate.
+  Argument :
+  - astdPredicate : The astd predicate we want to translate
+*)
+
+let rec translatePredicateList astdPredicate = match astdPredicate with
+  |[] -> ASTD_B.True
+  |[t] -> 
+    begin
+      match t with
+      |ASTD_predicate.IASTDPredicate _ -> failwith "This predicate is not supported"
+      |ASTD_predicate.BPredicate str -> ASTD_B.BPred str
+    end
+  |h::t ->
+    begin
+      match h with
+      |ASTD_predicate.IASTDPredicate _ -> failwith "This predicate is not supported"
+      |ASTD_predicate.BPredicate str -> ASTD_B.And(ASTD_B.BPred str,translatePredicateList astdPredicate)
+    end
+
+
+
+(*
   This operation returns the B predicate that verifies if the ASTD "astd" is final
   Arguments :
   - astd : the ASTD that has to be final
@@ -283,6 +306,10 @@ let rec final astd listVar = match astd with
 				   ASTD_B.In(ASTD_B.Variable ("State_"^name),
 					     ASTD_B.EnumerateSet dFinal)))
     end
+  |ASTD_astd.Fork (name,_,predicate_list,astdRight,astdLeft) ->
+    ASTD_B.Implies(translatePredicateList predicate_list,
+		   ASTD_B.And (final astdRight listVar,
+			       final astdLeft listVar))
   |ASTD_astd.Sequence (name,astdFst,astdSnd) -> ASTD_B.And (final astdSnd listVar,
 							    Implies (Equality (Variable ("State_" ^ name),
 									       Constant "fst"),
@@ -316,8 +343,11 @@ let rec final astd listVar = match astd with
 				ASTD_B.predMap (replaceVariable var "vv") (final subAstd listVar)))
   |ASTD_astd.QSynchronisation(name,var,domain,_,subAstd) ->
     Forall(var,(In(Variable var,Constant domain)),ASTD_B.predMap (quantifiedVariable var) (final subAstd listVar))
-  |ASTD_astd.Fork (name,var,domain,_,predicate,subAstd) ->
-    Forall(var,(In(Variable var,Constant domain)),ASTD_B.predMap (quantifiedVariable var) (final subAstd listVar))
+  |ASTD_astd.QFork (name,var,domain,predicate,_,subAstd) ->
+    Forall(var,
+	   ASTD_B.And((In(Variable var,Constant domain)),
+		      translatePredicateList predicate),
+	   ASTD_B.predMap (quantifiedVariable var) (final subAstd listVar))
 and dFinalStateCond dFinal astd listVar = match dFinal with
   |[] -> failwith "No DFinal State"
   |[t] -> ASTD_B.Implies (ASTD_B.Equality(ASTD_B.Variable ("State_" ^ (ASTD_astd.get_name astd)),
@@ -328,26 +358,6 @@ and dFinalStateCond dFinal astd listVar = match dFinal with
 				      final (getAstdFromName t astd) listVar),
 		      dFinalStateCond q astd listVar);;
 
-(*
-  This operation Translate the list of predicate in the guard of the ASTD into a B predicate.
-  Argument :
-  - astdPredicate : The astd predicate we want to translate
-*)
-
-let rec translatePredicateList astdPredicate = match astdPredicate with
-  |[] -> ASTD_B.True
-  |[t] -> 
-    begin
-      match t with
-      |ASTD_predicate.IASTDPredicate _ -> failwith "This predicate is not supported"
-      |ASTD_predicate.BPredicate str -> ASTD_B.BPred str
-    end
-  |h::t ->
-    begin
-      match h with
-      |ASTD_predicate.IASTDPredicate _ -> failwith "This predicate is not supported"
-      |ASTD_predicate.BPredicate str -> ASTD_B.And(ASTD_B.BPred str,translatePredicateList astdPredicate)
-    end
 
 (*
   This operation transform an arrow into a couple (precondition, postcondition). The precondition is a B predicate corresponding to the preOf of the function. The postcondition is a substitution corresponding to the thenOf of the function.
@@ -725,6 +735,45 @@ let rec modifyOperationsForSynchro opeListLeft opeListRight syncSet name = match
 	   ASTD_B.preOf = pre;
 	   ASTD_B.postOf = post})::(modifyOperationsForSynchro tailLeft opeNonLeft syncSet name)
 
+let createPrePostFork listLeft listRight syncList predicate = match (listLeft,listRight) with
+  |[],_ -> failwith "Shouldn't Happend"
+  |h1::h2::t,_ -> failwith "Shouldn't Happend"
+  |_,h1::h2::t -> failwith "Shouldn't Happend"
+  |[(nameLeft,opeLeft)],[] -> 
+    if isInSyncSet opeLeft.ASTD_B.nameOf syncList then
+      failwith "Shouldn't Happend"
+    else (opeLeft.ASTD_B.preOf, ASTD_B.Select ([(opeLeft.ASTD_B.preOf,opeLeft.ASTD_B.postOf)]))
+  |[(nameLeft,opeLeft)],[(nameRight,opeRight)] ->
+    if isInSyncSet opeLeft.ASTD_B.nameOf syncList then
+      (ASTD_B.Implies(predicate,
+		      ASTD_B.And (opeLeft.ASTD_B.preOf,
+				  opeRight.ASTD_B.preOf)),
+       ASTD_B.Parallel [opeLeft.ASTD_B.postOf;opeRight.ASTD_B.postOf])
+    else
+      (ASTD_B.Or (opeLeft.ASTD_B.preOf,
+		  opeRight.ASTD_B.preOf),
+       ASTD_B.Select [(opeLeft.ASTD_B.preOf,opeLeft.ASTD_B.postOf);
+		      (opeRight.ASTD_B.preOf,opeRight.ASTD_B.postOf)])
+
+let rec modifyOperationsForFork opeListLeft opeListRight syncSet name predicate = match (opeListLeft,opeListRight) with
+  |[],[] -> []
+  |[],(nameRight,opeRight)::tail ->
+    if isInSyncSet opeRight.ASTD_B.nameOf syncSet 
+    then failwith "Shouldn't Happend"
+    else
+      (name,{ASTD_B.nameOf = opeRight.ASTD_B.nameOf;
+	     ASTD_B.parameter = opeRight.ASTD_B.parameter;
+	     ASTD_B.preOf = opeRight.ASTD_B.preOf;
+	     ASTD_B.postOf = Select ([(opeRight.ASTD_B.preOf,opeRight.ASTD_B.postOf)])})::
+	modifyOperationsForFork opeListLeft tail syncSet name predicate
+  |(nameLeft,opeLeft)::tailLeft,listRight ->
+    let opeLeftList,opeNonLeft = seperateOperation opeLeft.ASTD_B.nameOf listRight in
+    let pre,post = createPrePostFork [nameLeft,opeLeft] opeLeftList syncSet predicate in
+    (name,{ASTD_B.nameOf = opeLeft.ASTD_B.nameOf;
+	   ASTD_B.parameter = opeLeft.ASTD_B.parameter;
+	   ASTD_B.preOf = pre;
+	   ASTD_B.postOf = post})::(modifyOperationsForFork tailLeft opeNonLeft syncSet name predicate)
+
 let modifyOperationForQChoice name var listVar operation = 
   let nameSubAstd,ope = operation in
   let pre1 = ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
@@ -831,7 +880,7 @@ let andPredicateAffectationLambdaElement pred1 element =
   let (str1,pred2,str2) = element in
   (str1,ASTD_B.And (pred1,pred2),str2)
 
-let makeOvlFork varQ domainQ predicate case ovl = 
+let makeOvlQFork varQ domainQ predicate case ovl = 
   let (varC,pred,affect) = case in
   let (varO,li) = ovl in
   match affect with
@@ -844,13 +893,13 @@ let makeOvlFork varQ domainQ predicate case ovl =
     end
   |_ -> failwith "badSub"
 
-let makeOneOvlFork varQ domainQ predicate caseP = 
+let makeOneOvlQFork varQ domainQ predicate caseP = 
   let varA = getVar caseP in
-  let (var,li) = (List.fold_right (makeOvlFork varQ domainQ predicate) caseP (varA,[])) in
+  let (var,li) = (List.fold_right (makeOvlQFork varQ domainQ predicate) caseP (varA,[])) in
   ASTD_B.AffectationLambda (var,li)
 
-let modifyPostOfForFork post var domain predicate =
-  quantifyPost var (ASTD_B.Parallel (List.rev_map (makeOneOvlFork var domain predicate) (regroupByVariable (casePredicate post))))
+let modifyPostOfForQFork post var domain predicate =
+  quantifyPost var (ASTD_B.Parallel (List.rev_map (makeOneOvlQFork var domain predicate) (regroupByVariable (casePredicate post))))
 
 let synchroOpe ope var domain =
   {ASTD_B.nameOf = ope.ASTD_B.nameOf;
@@ -860,14 +909,14 @@ let synchroOpe ope var domain =
 			 ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
    ASTD_B.postOf = modifyPostOfForQSync ope.ASTD_B.postOf var domain}
 
-let synchroOpeFork ope var domain predicate_list =
+let synchroOpeQFork ope var domain predicate_list =
   {ASTD_B.nameOf = ope.ASTD_B.nameOf;
    ASTD_B.parameter = ope.ASTD_B.parameter;
    ASTD_B.preOf = Forall(var,
 			 ASTD_B.And(In (Variable var, Constant domain),
 				    translatePredicateList predicate_list),
 			 ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
-   ASTD_B.postOf = modifyPostOfForFork ope.ASTD_B.postOf var domain (translatePredicateList predicate_list)}
+   ASTD_B.postOf = modifyPostOfForQFork ope.ASTD_B.postOf var domain (translatePredicateList predicate_list)}
 			 
 
 let rec isAParameter var params = match params with
@@ -897,10 +946,10 @@ let modifyOperationForQSync syncSet var domain ope =
     else
       (name,anyOpe ope var domain)
 
-let modifyOperationForFork syncSet var domain predicate_list ope =
+let modifyOperationForQFork syncSet var domain predicate_list ope =
   let (name,ope) = ope in
   if isInSyncSet ope.ASTD_B.nameOf syncSet then
-  (name,synchroOpeFork ope var domain predicate_list)
+  (name,synchroOpeQFork ope var domain predicate_list)
    else
     if (isAParameter var ope.parameter)
     then
@@ -996,6 +1045,12 @@ let rec translate_aux astd = match astd with
     (setListRight@setListLeft,
      varListRight@varListLeft,
      modifyOperationsForSynchro opeListRight opeListLeft syncList name)
+  |ASTD_astd.Fork (name,syncList,predicate_list,astdLeft,astdRight) ->
+    let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
+	setListRight,varListRight,opeListRight = translate_aux astdRight in
+    (setListRight@setListLeft,
+     varListRight@varListLeft,
+     modifyOperationsForFork opeListRight opeListLeft syncList name (translatePredicateList predicate_list))
   |ASTD_astd.QChoice (name,var,domain,subAstd) ->
     let setList,varList,opeList = translate_aux subAstd in
     (addEnumerateSetToSetList domain [] (addEnumerateSetToSetList "QChoiceSet" ["chosen";"notChosen"] setList),
@@ -1017,11 +1072,11 @@ let rec translate_aux astd = match astd with
     (setList,
      List.rev_map (quantifiedVariableInVarList domain) varList,
      List.rev_map (modifyOperationForQSync syncSetList var domain) opeList)
-  |ASTD_astd.Fork(name,var,domain,predicate_list,synchSetList,subAstd) ->
+  |ASTD_astd.QFork(name,var,domain,predicate_list,synchSetList,subAstd) ->
     let setList,varList,opeList = translate_aux subAstd in
     (setList,
      List.rev_map (quantifiedVariableInVarList domain) varList,
-     List.rev_map (modifyOperationForFork synchSetList var domain predicate_list) opeList)
+     List.rev_map (modifyOperationForQFork synchSetList var domain predicate_list) opeList)
 and translateStateList stateList nameTranslatedAstd = match stateList with
   |h::t -> let (setListOfH,varListOfH,opeListOfH) = translate_aux h in
 	   let (setListOfT,varListOfT,opeListOfT) = translateStateList t nameTranslatedAstd

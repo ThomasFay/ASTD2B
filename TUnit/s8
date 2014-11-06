@@ -1,5 +1,6 @@
-(MAIN,<|[]|;
+(MAIN,</|\;
        {Reinit};
+       {"State_AUT1 = A1"};
        (AUT1,<aut;
 	      { (A1->elem),
 	        (A2->elem),
