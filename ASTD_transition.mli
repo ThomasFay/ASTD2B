@@ -1,14 +1,14 @@
 (** ASTD event module *)
 
 (**The {!ASTD_transition.t} type refers to the function indicated on each arrow. It contains a label and a list of parameters that can be constants ,variables or a joker*)
-type t = Transition of ASTD_label.t * ASTD_term.params 
+type t = Transition of ASTD_label.t * (ASTD_term.t * ASTD_term.t) list
 
 
 
 
 (** {3 Constructors} *)
 
-val transition : ASTD_label.t -> ASTD_term.params -> t
+val transition : ASTD_label.t -> (ASTD_term.t * ASTD_term.t) list -> t
 
 
 (** {3 Accessors} *)

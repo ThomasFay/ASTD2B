@@ -1,7 +1,7 @@
 exception NotFound of string;;
 exception InitIsAny of ASTD_B.predicateB;;
 exception TrueGuard of ASTD_B.substitutionB;;
-
+exception NoParam;;
 (*
   This operation adds the state nameOfTheState to the set nameOfTheStateSet in the setList.
   The set setList is a list (string,(string list)). The first part of the couple is the name of the state, the second part is the list of the values of the enumerate set. If the set doesn't exists, it is created with the name ("AutState_nameOfTheStateSet") and one enumerate value nameOfTheState
@@ -442,6 +442,7 @@ let transformSubOperation name elem =
 	       operation.ASTD_B.preOf),
    operation.ASTD_B.postOf);;
 
+
 (*
   This operation transform the list of transition in operations, and merges it with the list of allready translated operations. It takes 5 arguments :
   - astd : The current translated astd
@@ -462,7 +463,7 @@ let merge astd nameOperation hOperationList hTransitionList listVar param=
 let rec toStringParamList param = match param with
   |[] -> []
   |h::t -> match h with
-    |ASTD_term.Var s -> s::(toStringParamList t)
+    |(ASTD_term.Var s,ASTD_term.Var s2) -> (s,s2)::(toStringParamList t)
     |_ -> failwith "Unbound Parameter"
 
 let rec getParamFromTransition h = 
@@ -480,7 +481,9 @@ let modifyOperationOfSubAstd astd ope =
 	 ASTD_B.postOf = ASTD_B.Select [(ASTD_B.And (ASTD_B.Equality (ASTD_B.Variable ("State_" ^ name),
 						     ASTD_B.Constant nameOpe),
 				    opeOpe.preOf),
-					 opeOpe.postOf)]})
+					 ASTD_B.Parallel[opeOpe.postOf;
+							 ASTD_B.Affectation(ASTD_B.Variable ("State_" ^ name),
+									    ASTD_B.Constant nameOpe)])]})
 
 (*
   This operation construct the new operation list of the translation. It gives an operation list.
@@ -814,8 +817,7 @@ and quantifySelectCase var ca = let (pred,sub) = ca in
 let quantifiedOpe ope var domain =
   {ASTD_B.nameOf = ope.ASTD_B.nameOf;
    ASTD_B.parameter = ope.ASTD_B.parameter;
-   ASTD_B.preOf = ASTD_B.And (ASTD_B.In (Variable var,Constant domain),
-			      ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf);
+   ASTD_B.preOf = ASTD_B.predMap (quantifiedVariable var) ope.ASTD_B.preOf;
    ASTD_B.postOf = quantifyPost var ope.ASTD_B.postOf}
 
 
@@ -921,7 +923,7 @@ let synchroOpeQFork ope var domain predicate_list =
 
 let rec isAParameter var params = match params with
   |[] -> false
-  |t::q -> if t=var then true else isAParameter var q
+  |(param,typ)::q -> if param=var then true else isAParameter var q
 
 let anyOpe ope var domain =
   let predicate = ASTD_B.And(ASTD_B.In (Variable var, Constant domain),
@@ -1042,13 +1044,13 @@ let rec translate_aux astd = match astd with
   |ASTD_astd.Synchronisation (name,syncList,astdLeft,astdRight) ->
     let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
 	setListRight,varListRight,opeListRight = translate_aux astdRight in
-    (setListRight@setListLeft,
+    (setListFusion setListRight setListLeft,
      varListRight@varListLeft,
      modifyOperationsForSynchro opeListRight opeListLeft syncList name)
   |ASTD_astd.Fork (name,syncList,predicate_list,astdLeft,astdRight) ->
     let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
 	setListRight,varListRight,opeListRight = translate_aux astdRight in
-    (setListRight@setListLeft,
+    (setListFusion setListRight setListLeft,
      varListRight@varListLeft,
      modifyOperationsForFork opeListRight opeListLeft syncList name (translatePredicateList predicate_list))
   |ASTD_astd.QChoice (name,var,domain,subAstd) ->
@@ -1088,25 +1090,47 @@ let rec getInfoFromVarList varList = match varList with
   |(name,invList,init)::t -> let nameList,invList_list,initList = getInfoFromVarList t in
 			     (name::nameList,((name,invList)::invList_list),init::initList);;
 
-let callOpe op =
+let rec typeParameters param = match param with
+  |[] -> raise NoParam
+  |[param,typ] -> ASTD_B.In (ASTD_B.Variable param,
+			     ASTD_B.Constant typ)
+  |(param,typ)::t -> ASTD_B.And ( ASTD_B.In (ASTD_B.Variable param,
+					     ASTD_B.Constant typ),
+				  typeParameters t)
+
+let finalizeOpe nocalls op =
   {ASTD_B.nameOf = op.ASTD_B.nameOf;
    ASTD_B.parameter = op.ASTD_B.parameter;
-   ASTD_B.preOf = op.ASTD_B.preOf;
+   ASTD_B.preOf =
+     begin
+       try ASTD_B.And(typeParameters op.ASTD_B.parameter,
+		      op.ASTD_B.preOf)
+       with
+       |NoParam -> op.ASTD_B.preOf
+     end;
    ASTD_B.postOf =
-     match op.postOf with
-     |ASTD_B.Parallel li -> ASTD_B.Parallel (Call ((op.nameOf ^ "_act"),op.parameter)::li)
-     |_ -> ASTD_B.Parallel [Call ((op.nameOf ^ "_act"),op.parameter);op.postOf];
+     if nocalls
+     then op.postOf
+     else
+       begin
+	 match op.postOf with
+	 |ASTD_B.Parallel li -> ASTD_B.Parallel (Call ((op.nameOf ^ "_act"),List.map fst op.parameter)::li)
+	 |_ -> ASTD_B.Parallel [Call ((op.nameOf ^ "_act"),List.map fst op.parameter);op.postOf]
+       end;
   }
 
-let translate astd name refine sees includes = let setsList,varList,opeList = translate_aux astd in
-				      let variables,invariants,initialisation=getInfoFromVarList varList in
-				      let machine = {ASTD_B.machine = if refine="" then Machine name else (Refinement (name,refine));
-						     ASTD_B.sees = if sees="" then NoSeenMachine else SeenMachine sees;
-						     ASTD_B.includes = if includes="" then NoIncludedMachine else IncludedMachine includes;
-						     ASTD_B.sets = setsList;
-						     ASTD_B.variables = variables;
-						     ASTD_B.invariants = invariants;
-						     ASTD_B.init = initialisation;
-						     ASTD_B.operations = List.rev_map callOpe (List.rev_map snd opeList)} in
-				      ASTD_B.print_machine machine;;
+let translate astd name refine sees includes nocalls inv ass =
+  let setsList,varList,opeList = translate_aux astd in
+  let variables,invariants,initialisation=getInfoFromVarList varList in
+  let machine = {ASTD_B.machine = if refine="" then Machine name else (Refinement (name,refine));
+		 ASTD_B.sees = if sees="" then NoSeenMachine else SeenMachine sees;
+		 ASTD_B.includes = if includes="" then NoIncludedMachine else IncludedMachine includes;
+		 ASTD_B.sets = setsList;
+		 ASTD_B.variables = variables;
+		 ASTD_B.assertions = ass;
+		 ASTD_B.invariants = {ASTD_B.typage = invariants;
+				      ASTD_B.invariantsPreuve = inv;};
+		 ASTD_B.init = initialisation;
+		 ASTD_B.operations = List.rev_map (finalizeOpe nocalls) (List.rev_map snd opeList)} in
+  ASTD_B.print_machine machine;;
 

@@ -131,7 +131,7 @@ begin
 end
 
 
-
+(*
 let valid_arrow event env arrow = let is_valid =
                                      (
                                       (begin let c= (ASTD_event.compare_action_with_event2 env (get_transition arrow) event)
@@ -153,3 +153,4 @@ let valid_arrow event env arrow = let is_valid =
 
 
 
+ *)

@@ -24,9 +24,10 @@ val get_structure_from_stdin : unit -> unit
 
 (** get and parse a structure:
     - {!get_event_list_from} ["stdin"] gets it from the [stdin] channel
-    - {!get_event_list_from} [filename] gets it from the file named [filename].*)
+    - {!get_event_list_from} [filename] gets it from thefile named [filename]
 val get_event_list_from : string -> ASTD_event.t list
-
-(** get and parse a structure from the [stdin] channel. *)
+ *)
+(** get and parse a structure from the [stdin] channel. 
 val get_event_list_from_stdin : unit -> ASTD_event.t list
 
+					*)

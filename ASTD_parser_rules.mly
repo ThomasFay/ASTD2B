@@ -9,7 +9,6 @@
 	open ASTD_predicate;;
         open ASTD_predicate_definitions;;
         open ASTD_transition;;
-	open ASTD_event;;
 	open ASTD_arrow;;
 	open ASTD_astd;; 
 
@@ -48,12 +47,11 @@
 %nonassoc PAR_PE
 
 %start structure
-%start apply_event
+
 %type <unit> structure
 
 
 
-%type <ASTD_event.t list> apply_event
 
 
 %%
@@ -176,12 +174,12 @@ list_of_params_scheme :
 ;
 
 list_of_params_scheme_content :
-    | IDENTITY_NAME COMMA list_of_params_scheme_content
+    | IDENTITY_NAME COLON IDENTITY_NAME COMMA list_of_params_scheme_content
       { astd_parser_msg ("List of params "); 
-        (ASTD_term.Var(ASTD_variable.of_string $1))::$3 }
-    | IDENTITY_NAME
+        ((ASTD_term.Var(ASTD_variable.of_string $1)),(ASTD_term.Var(ASTD_variable.of_string $3)))::$5 }
+    | IDENTITY_NAME COLON IDENTITY_NAME
       { astd_parser_msg ("List of params "); 
-        (ASTD_term.Var(ASTD_variable.of_string $1))::[]  }
+        ((ASTD_term.Var(ASTD_variable.of_string $1)),(ASTD_term.Var(ASTD_variable.of_string $3)))::[]  }
     ;
 
 
@@ -485,47 +483,5 @@ term :
 
 
 
-apply_event:
-  | event_to_apply SCOLON apply_event
-     {$1::$3}
-  | event_to_apply apply_event
-     {$1::$2}
-  | event_to_apply
-     {$1::[]}
-  | event_to_apply SCOLON
-     {$1::[]}
-;
-
-
-
-
-
-event_to_apply:
-  | IDENTITY_NAME list_of_int
-      { astd_parser_msg ("Event " ^ $1); 
-        ASTD_event.event (ASTD_label.of_string $1) $2 }
-  | IDENTITY_NAME 
-      { astd_parser_msg ("Transition without params construction " ^ $1); 
-        ASTD_event.event (ASTD_label.of_string $1) [] }
-;
-
-
-
-list_of_int:
-  |LPAR list_of_value_content RPAR
-      {$2}
-;
-
-
-list_of_value_content :
-    | INT_VALUE COMMA list_of_value_content
-      { (ASTD_constant.of_int $1)::$3 }
-    | INT_VALUE 
-      { (ASTD_constant.of_int $1)::[] }
-    | STRING_VALUE COMMA list_of_value_content
-      { (ASTD_constant.Symbol ($1))::$3 }
-    | STRING_VALUE
-      { (ASTD_constant.Symbol ($1))::[] }
-    ;
 
 

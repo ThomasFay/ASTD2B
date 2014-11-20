@@ -12,6 +12,10 @@ let refinement = ref ""
 let name = ref ""
 let sees = ref ""
 let includes = ref ""
+let nocalls = ref false
+let invFile = ref ""
+let starting = ref ""
+let assertFile = ref ""
 
 
 let set_to_ref refInt value () = ignore ( refInt := value )
@@ -35,6 +39,10 @@ let arg_spec = [
   "-name", Arg.Set_string name, "The name of the B machine";
   "-sees", Arg.Set_string sees, "The seen machine if there is one";
   "-includes", Arg.Set_string includes, "The included machine if necessary";
+  "-nocalls", Arg.Set nocalls, "Do not call the data operations";
+  "-invFile",Arg.Set_string invFile, "If necessary, add the file that contains the invariants";
+  "-starting",Arg.Set_string starting, "+ name : chose the name of the starting ASTD. Default MAIN";
+  "-assertFile", Arg.Set_string assertFile, "If necessary, add the file that contain assertions";
   (* "-debug", Arg.Unit debug_on , "Activate debug output"; *)
 ]
 
@@ -62,7 +70,7 @@ let get_structure_from_file (place) = try let structure=ASTD_parser.get_structur
                                                ASTD_parser.get_structure_from_stdin () 
                                                end 
 ;;
-
+(*
 let get_event_list (place) = print_endline ("Enter file name of the instructions : "^place) ; 
                            try let name = (place^(input_line stdin))
                                in print_endline ("Reading from " ^ name) ;
@@ -83,7 +91,7 @@ let get_event_list_from_file (place) = try let events=ASTD_parser.get_event_list
                                                ASTD_parser.get_event_list_from_stdin () 
                                                end 
 ;;
-
+ *)
 
 let get_starting_name (starting_choice_possible) =
 	if starting_choice_possible
@@ -97,19 +105,51 @@ let get_starting_name (starting_choice_possible) =
 		else "MAIN"
 
 
+let rec get_invariants file =
+  try
+    let line = input_line (file) in
+    line ^ "\n" ^ get_invariants file
+  with
+    End_of_file -> ""
+
+let readInvFile file place =
+  try match file with
+      |"" -> ""
+      |_ -> get_invariants (open_in (place ^ file))
+  with
+    Sys_error s -> ""
+
+let rec get_assertions file =
+  try
+    let line = input_line (file) in
+    line ^ "\n" ^ get_invariants file
+  with
+    End_of_file -> ""
+
+let readAssertFile file place =
+  try match file with
+      |"" -> ""
+      |_ -> get_invariants (open_in (place ^ file))
+  with
+    Sys_error s -> ""
+
 let _ = Arg.parse arg_spec usage usage_msg;
-  let (affichage,kappa_indirect,print_final, starting_choice_possible, place_to_read, bdd, wait, debug, sFile, iFile,refine,name,sees,includes)
-      = (!raffichage,!rkappa_indirect,!rprint_final,!rstarting_choice_possible,!rplace_to_read,!rbdd,!rwait,!rdebug,!rsFile,!riFile,!refinement,!name,!sees,!includes)
-  in begin if (sFile=="") then get_structure(place_to_read) else get_structure_from_file(place_to_read^sFile) ;
-    let structure=ASTD_astd.get_astd (get_starting_name (starting_choice_possible))
-    in 
-    let
-      nameBFile = (if (name == "") then "MachineName" else name)
-    in
-    print_endline(ASTD_translate.translate structure nameBFile refine sees includes)
+  let (affichage,kappa_indirect,print_final, starting_choice_possible, place_to_read, bdd, wait, debug, sFile, iFile,refine,name,sees,includes,nocalls,invFile,starting,assertFile)
+      = (!raffichage,!rkappa_indirect,!rprint_final,!rstarting_choice_possible,!rplace_to_read,!rbdd,!rwait,!rdebug,!rsFile,!riFile,!refinement,!name,!sees,!includes,!nocalls,!invFile,!starting,!assertFile)
+  in
+  begin if (sFile=="") then get_structure(place_to_read) else get_structure_from_file(place_to_read^sFile) ;
+	let startingName = if starting = "" then "MAIN" else starting in
+	let structure=ASTD_astd.get_astd startingName
+	in 
+	let invariants = readInvFile invFile place_to_read and assertions = readAssertFile assertFile place_to_read
+	in
+	let
+	  nameBFile = (if (name == "") then "MachineName" else name)
+	in
+	print_endline(ASTD_translate.translate structure nameBFile refine sees includes nocalls invariants assertions)
   end
 ;;
-
+  
 
 (*
 (* Main part *)

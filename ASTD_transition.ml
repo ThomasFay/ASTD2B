@@ -1,5 +1,5 @@
 
-type t = Transition of ASTD_label.t * ASTD_term.params 
+type t = Transition of ASTD_label.t * (ASTD_term.t * ASTD_term.t) list
 
 
 
@@ -10,7 +10,7 @@ let get_label a = let Transition(label,_)=a in label
 ;;
 
 
-let get_params a = let Transition(_,consts)=a in consts
+let get_params a = let Transition(_,consts)=a in List.map fst consts
 ;;
 
 let rec is_included label trans_list = match trans_list with

@@ -23,7 +23,6 @@ BASE = functions \
 	ASTD_label ASTD_environment\
 	ASTD_predicate ASTD_predicate_definitions \
 	ASTD_transition \
-	ASTD_event \
 	ASTD_arrow \
 	ASTD_B \
 	ASTD_optimisation \

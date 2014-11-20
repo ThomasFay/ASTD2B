@@ -99,11 +99,10 @@ let rec study_comparison arg params = match (arg,params) with
  |_->failwith "parameters and arguments should have the same number" 
 
 
-let correspond trans event = if ((ASTD_transition.get_label trans)=(ASTD_event.get_label event))
+(*let correspond trans event = if ((ASTD_transition.get_label trans)=(ASTD_event.get_label event))
                                 then (study_comparison (ASTD_transition.get_params trans) (ASTD_event.get_const event))
                                 else false
                              
- 
 
 let rec get_val_arrow a_list event = match a_list with
   | (trans,v_list)::t -> if (correspond (trans) (event)) 
@@ -111,6 +110,7 @@ let rec get_val_arrow a_list event = match a_list with
                                                      else  (get_val_arrow t event) 
   | [] -> ASTD_constant.empty_dom
 ;;
+  *)
 
 
 

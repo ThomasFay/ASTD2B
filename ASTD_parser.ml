@@ -30,7 +30,7 @@ let get_structure_from iname =
 let get_structure_from_stdin = fun () -> (get_structure_from "stdin")
 
 
-
+(*
 
 let get_event_list_from iname =
     let getter = if (iname = "stdin")
@@ -44,3 +44,4 @@ let get_event_list_from_stdin = fun () -> (get_event_list_from "stdin")
 
 
 
+ *)

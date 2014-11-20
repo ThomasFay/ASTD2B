@@ -31,7 +31,7 @@ type initialisation =
 
 type operation = {
   nameOf : string;
-  parameter : string list;
+  parameter : (string*string) list;
   preOf : predicateB;
   postOf : substitutionB;
 }
@@ -48,13 +48,19 @@ type includesMachine =
   |IncludedMachine of string
   |NoIncludedMachine
 
+type inv = {
+  typage :  (string * (string list)) list;
+  invariantsPreuve : string;
+}
+
 type machineB = {
   machine : typeOfMachine;
   sees : seesMachine;
   includes : includesMachine;
   sets : (string * (string list)) list;
   variables : string list;
-  invariants : (string * (string list)) list;
+  assertions : string;
+  invariants : inv;
   init : initialisation list;
   operations : operation list;
 }

@@ -49,7 +49,7 @@ val is_local : t-> bool
 
 val register_transition : string->ASTD_transition.t -> unit
 val register_transitions_from_list : string->ASTD_transition.t list -> unit
-val get_transition_params : string->ASTD_label.t -> ASTD_term.params list
+val get_transition_params : string->ASTD_label.t -> (ASTD_term.t * ASTD_term.t) list list
 
 
 
@@ -61,7 +61,7 @@ val evaluate_guard : ASTD_environment.t -> ASTD_predicate.t list -> bool
 (** Evaluate the guard. If the value used for a variable is ASTD_constant.FreeConst, the predicate is estimated at true. *)
 val estimate_guard : ASTD_environment.t -> ASTD_predicate.t list -> bool
 
-(** Evaluate the predicates on the arrow and compare the event with the transition. *)
-val valid_arrow : ASTD_event.t -> ASTD_environment.t -> t -> bool
+(** Evaluate the predicates on the arrow and compare the event with the transition. 
+val valid_arrow : ASTD_event.t -> ASTD_environment.t -> t -> bool*)
 
 

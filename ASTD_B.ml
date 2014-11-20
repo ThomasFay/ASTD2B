@@ -32,7 +32,7 @@ type initialisation =
 
 type operation = {
   nameOf : string;
-  parameter : string list;
+  parameter : (string * string) list;
   preOf : predicateB;
   postOf : substitutionB;
 }
@@ -49,13 +49,19 @@ type includesMachine =
   |IncludedMachine of string
   |NoIncludedMachine
 
+type inv = {
+  typage : (string * (string list)) list;
+  invariantsPreuve : string;
+}
+
 type machineB = {
   machine : typeOfMachine;
   sees : seesMachine;
   includes : includesMachine;
   sets : (string * (string list)) list;
   variables : string list;
-  invariants : (string * (string list)) list;
+  assertions : string;
+  invariants : inv;
   init : initialisation list;
   operations : operation list;
 }
@@ -153,15 +159,20 @@ let strOfValue bSet = match bSet with
 
 let rec printParam parameter = match parameter with
   |[] -> ""
-  |[t] -> t
-  |h::t -> h ^ "," ^ printParam t;;
+  |[param,typ] -> param
+  |(param,typ)::t -> param ^ "," ^ printParam t;;
 
 let printCart h ca = h ^ " * {" ^ ca ^ "}"
+
+let rec printParamWithoutType parameter = match parameter with
+  |[] -> ""
+  |[param] -> param
+  |(param)::t -> param ^ "," ^ printParamWithoutType t;;
 
 let rec printBSet bSet = match bSet with
   |Variable s -> s
   |Constant s -> s
-  |Function (var,paramList)  -> var ^ "(" ^ printParam paramList ^ ")"
+  |Function (var,paramList)  -> var ^ "(" ^ printParamWithoutType paramList ^ ")"
   |EnumerateSet l -> "{" ^ printValList l ^ "}"
   |CartesianP (h::t) -> List.fold_left printCart h t
  
@@ -192,7 +203,7 @@ let rec printSubstitution sub n= match sub with
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
   |AffectationLambda (var, li) ->  indent n ^ var ^ " := " ^ List.fold_left (printLambdaOvl n) var li
   |Call (name,parameters) -> indent n ^ name ^ begin
-						 let param = printParam parameters in
+						 let param = printParamWithoutType parameters in
 						 if param = ""
 						 then ""
 						 else "(" ^ param ^ ")"
@@ -226,7 +237,7 @@ let rec printTypage typage = match typage with
 
 let rec printInv inv = match inv with
   |[] -> ""
-  |[(var,typage)] -> indent 3 ^ var ^ " : " ^ printTypage typage ^ "\n"
+  |[(var,typage)] -> indent 3 ^ var ^ " : " ^ printTypage typage
   |(var,typage)::t -> indent 3 ^ var ^ " : " ^ printTypage typage ^ " &\n" ^ printInv t;;
 
 let rec printInitTypage typage value = match typage with
@@ -268,7 +279,15 @@ let rec print_machine ma =
     |NoIncludedMachine -> ""
     |IncludedMachine s -> "\nINCLUDES\n" ^ indent 3 ^ s
   in
+  let assertionString = match ma.assertions with
+    |"" -> ""
+    |_ -> "ASSERTIONS\n" ^ ma.assertions
+  in
+  let invPreuve = if ma.invariants.invariantsPreuve = ""
+		  then "\n"
+		  else " &\n" ^ ma.invariants.invariantsPreuve
+  in
   begin
-  nameOf ^ seeString ^ includeString ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ "INVARIANT\n" ^ printInv ma.invariants ^ "INITIALISATION\n" ^ printInit ma.init ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
+  nameOf ^ seeString ^ includeString ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ assertionString ^ "INVARIANT\n" ^ printInv ma.invariants.typage ^ invPreuve ^ "INITIALISATION\n" ^ printInit ma.init ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
 end;;
 
