@@ -12,7 +12,7 @@
 	open ASTD_arrow;;
 	open ASTD_astd;; 
 
-    let astd_parser_debug = false ;;
+	let astd_parser_debug = false ;;
     let astd_parser_msg m = if (astd_parser_debug) 
                             then (print_endline m )
                             else (ignore m);;

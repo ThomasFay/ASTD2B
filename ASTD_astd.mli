@@ -102,12 +102,6 @@ val get_data_guard :t -> (astd_name * ASTD_predicate.t list * t)
 val get_data_call : t -> (astd_name * astd_name * ((ASTD_variable.t *ASTD_term.t) list ))
 
 
-(**Finds all transitions accessible from the sub_astd *)
-val get_sub_transitions : astd_name list ->t -> ASTD_transition.t list
-val get_sub_arrows : astd_name list -> t -> ASTD_arrow.t list
-val get_sub_names : astd_name list -> t -> astd_name list
-
-
 (** {3 Manipulation Functions} *)
 
 val rename_astd: t -> astd_name -> t
@@ -124,8 +118,7 @@ val is_automata : t ->bool
 (**Finds the right sub astd from a list using his name *)
 val find_subastd : astd_name -> t list -> t 
 
-(**Check if if the initial state of the astd is sure to be final or if we don't know for sure without checking the environment*)
-val is_init_final : t -> astd_name list -> string
+
 
 
 
@@ -145,9 +138,5 @@ val get_call_astd : astd_name -> (t*((ASTD_variable.t * ASTD_constant.domain ) l
 val global_save_astd : t->(ASTD_variable.t * ASTD_constant.domain ) list->unit
 
 
-
-(** {3 Printer} *)
-
-val print : t->string-> unit
 
 

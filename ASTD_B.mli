@@ -1,33 +1,34 @@
 type bSet =
-  Variable of string
-| Constant of string
-| Function of string * (string list)
-| EnumerateSet of string list
-| CartesianP of string list
+    Variable of string
+  | QVar of string
+  | Constant of string
+  | Function of string * (string list)
+  | EnumerateSet of string list
+  | CartesianP of string list
 
 type predicateB =
-  Equality of bSet * bSet
-| BPred of string
-| And of predicateB * predicateB
-| Or of predicateB * predicateB
-| In of bSet * bSet
-| True
-| False
-| Implies of predicateB * predicateB
-| Exists of string * predicateB
-| Forall of string * predicateB * predicateB
+    Equality of bSet * bSet
+  | BPred of string
+  | And of predicateB * predicateB
+  | Or of predicateB * predicateB
+  | In of bSet * bSet
+  | True
+  | False
+  | Implies of predicateB * predicateB
+  | Exists of string * predicateB
+  | Forall of string * predicateB * predicateB
 
 type substitutionB =
-  Select of (predicateB * substitutionB) list
-| Affectation of bSet * bSet
-| Parallel of substitutionB list
-| AffectationLambda of string * (string * predicateB * string) list
-| Call of string * (string list)
-| Any of string * predicateB * substitutionB
+    Select of (predicateB * substitutionB) list
+  | Affectation of bSet * bSet
+  | Parallel of substitutionB list
+  | AffectationLambda of (string list) * (string * predicateB * string) list
+  | CallB of string * (string list)
+  | Any of string * predicateB * substitutionB
 
 type initialisation =
-| AffectationInit of bSet * bSet
-| AnyInit of string * predicateB * bSet * bSet
+  | AffectationInit of bSet * bSet
+  | AnyInit of string * predicateB * bSet * bSet
 
 type operation = {
   nameOf : string;

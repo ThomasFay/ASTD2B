@@ -1,20 +1,20 @@
 (MAIN,<*;
         (AUT0,<|[]|:;
                x;
-               [1,10];
+               "Tx";
                {Emprunter,Empruntern,Rendre,Rendren,Reinit,Reinitn};
                (AUT1 , <aut;
                         { (A1->elem),
                           (A2-> < =>;
-                                  {[isGreaterThanOne (x)]};
+                                  {"dom(State_A2 /= {})"};
                                   (AUT2 , <aut;
                                            { (A4->elem),
                                              (A5->elem),
                                              (A6->elem)
                                            };
-                                           { ((local,A4,A5),Empruntern,{},False),
-                                             ((local,A5,A6),Rendren,{},False),
-                                             ((local,A6,A4),Reinitn,{},False)
+                                           { ((local,A4,A5),Empruntern,{""},False),
+                                             ((local,A5,A6),Rendren,{""},False),
+                                             ((local,A6,A4),Reinitn,{""},False)
                                            };
                                            { 
                                              A6
@@ -28,9 +28,9 @@
                           ),
                           (A3->elem)
                         };
-                        { ((local,A1,A2),Emprunter,{},False),
-                          ((local,A2,A3),Rendre,{},False),
-                          ((local,A3,A1),Reinit,{},False)
+                        { ((local,A1,A2),Emprunter,{""},False),
+                          ((local,A2,A3),Rendre,{""},False),
+                          ((local,A3,A1),Reinit,{""},False)
                         };
                         { 
                           A3

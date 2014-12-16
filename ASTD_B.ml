@@ -1,34 +1,35 @@
 type bSet =
-  Variable of string
-| Constant of string
-| Function of string * (string list)
-| EnumerateSet of string list
-| CartesianP of string list
+    Variable of string
+   | QVar of string
+   | Constant of string
+   | Function of string * (string list)
+   | EnumerateSet of string list
+   | CartesianP of string list
 
 
 type predicateB =
-  Equality of bSet * bSet
-| BPred of string
-| And of predicateB * predicateB
-| Or of predicateB * predicateB
-| In of bSet * bSet
-| True
-| False
-| Implies of predicateB * predicateB
-| Exists of string * predicateB
-| Forall of string * predicateB * predicateB;;
+    Equality of bSet * bSet
+  | BPred of string
+  | And of predicateB * predicateB
+  | Or of predicateB * predicateB
+  | In of bSet * bSet
+  | True
+  | False
+  | Implies of predicateB * predicateB
+  | Exists of string * predicateB
+  | Forall of string * predicateB * predicateB;;
 
 type substitutionB =
-  Select of (predicateB * substitutionB) list
-| Affectation of bSet * bSet
-| Parallel of substitutionB list
-| AffectationLambda of string * (string * predicateB * string) list
-| Call of string * (string list)
-| Any of string * predicateB * substitutionB
+    Select of (predicateB * substitutionB) list
+  | Affectation of bSet * bSet
+  | Parallel of substitutionB list
+  | AffectationLambda of string list * (string * predicateB * string) list
+  | CallB of string * (string list)
+  | Any of string * predicateB * substitutionB
 
 type initialisation =
-| AffectationInit of bSet * bSet
-| AnyInit of string * predicateB * bSet * bSet
+  | AffectationInit of bSet * bSet
+  | AnyInit of string * predicateB * bSet * bSet
 
 type operation = {
   nameOf : string;
@@ -121,7 +122,7 @@ and simplifySelectCase li = match li with
 		      |False -> simplifySelectCase t
 		      |_ -> (pred,sub)::(simplifySelectCase t)
 		    end
-								 
+		      
 
 
 let rec indent n = match n with
@@ -162,37 +163,77 @@ let rec printParam parameter = match parameter with
   |[param,typ] -> param
   |(param,typ)::t -> param ^ "," ^ printParam t;;
 
-let printCart h ca = h ^ " * {" ^ ca ^ "}"
+let printCart h ca = h ^ " * {" ^ ca
 
+let closeBracket h ca = h ^ "}"
+					 
 let rec printParamWithoutType parameter = match parameter with
   |[] -> ""
-  |[param] -> param
-  |(param)::t -> param ^ "," ^ printParamWithoutType t;;
+  |[param] -> "(" ^ param ^ ")"
+  |(param)::t -> "(" ^ param ^ ")" ^ printParamWithoutType t;;
 
 let rec printBSet bSet = match bSet with
   |Variable s -> s
+  |QVar s -> s
   |Constant s -> s
-  |Function (var,paramList)  -> var ^ "(" ^ printParamWithoutType paramList ^ ")"
+  |Function (var,paramList)  -> var ^ printParamWithoutType paramList
   |EnumerateSet l -> "{" ^ printValList l ^ "}"
-  |CartesianP (h::t) -> List.fold_left printCart h t
- 
+  |CartesianP (h::t) -> List.fold_left printCart h t ^ (List.fold_left closeBracket "" t)
+  |CartesianP [] -> failwith "Bad Cartesian Product"
+				       
 let rec printPredicateB_aux pred n left = match pred with
-  |Equality (set1,set2) -> (if left then indent 0 else indent n) ^ printBSet set1 ^ " = " ^ printBSet set2
-  |And (expr1,expr2) -> (if left then indent 0 else indent n) ^ "(" ^ (printPredicateB_aux expr1 (n+1) true) ^ " & \n" ^ (printPredicateB_aux expr2 (n+1) false) ^ ")"
-  |Or (expr1,expr2) ->  (if left then indent 0 else indent n) ^ "(" ^ (printPredicateB_aux expr1 (n+1) true) ^ " or \n" ^ (printPredicateB_aux expr2 (n+1) false) ^ ")"
-  |In (set1,set2) -> (if left then indent 0 else indent n) ^ printBSet set1 ^ " : " ^ printBSet set2
-  |True -> (if left then indent 0 else indent n) ^ "True"
-  |BPred str -> (if left then indent 0 else indent n) ^ str
-  |Implies (pred1,pred2) -> (if left then indent 0 else indent n) ^ "(" ^ printPredicateB_aux pred1 n true ^ " =>\n" ^ printPredicateB_aux pred2 (n+3) false ^ ")"
-  |Exists (variable,pred) -> indent n ^ "#" ^ variable ^ ".(" ^ printPredicateB_aux pred (n+3) true ^ ")"
+  |Equality (set1,set2) ->
+    (if left
+     then indent 0
+     else indent n) ^ printBSet set1 ^ " = " ^ printBSet set2
+  |And (expr1,expr2) ->
+    (if left
+     then indent 0
+     else indent n) ^ "(" ^ (printPredicateB_aux expr1 (n+1) true) ^
+      " & \n" ^ (printPredicateB_aux expr2 (n+1) false) ^ ")"
+  |Or (expr1,expr2) ->
+    (if left
+     then indent 0
+     else indent n) ^
+      "(" ^ (printPredicateB_aux expr1 (n+1) true) ^
+	" or \n" ^ (printPredicateB_aux expr2 (n+1) false) ^ ")"
+  |In (set1,set2) ->
+    (if left
+     then indent 0
+     else indent n) ^ printBSet set1 ^ " : " ^ printBSet set2
+  |True ->
+    (if left
+     then indent 0
+     else indent n) ^ "True"
+  |BPred str ->
+    (if left
+     then indent 0
+     else indent n) ^ str
+  |Implies (pred1,pred2) ->
+    (if left
+     then indent 0
+     else indent n) ^ "(" ^ printPredicateB_aux pred1 n true ^
+      " =>\n" ^ printPredicateB_aux pred2 (n+3) false ^ ")"
+  |Exists (variable,pred) ->
+    indent n ^ "#" ^ variable ^ ".(" ^ printPredicateB_aux pred (n+3) true ^ ")"
   |False -> (if left then indent 0 else indent n) ^ "False"
-  |Forall (variable,pred1,pred2) -> (if left then indent 0 else indent n) ^ "!" ^ variable ^ ".(" ^ printPredicateB_aux pred1 (n+3) true ^ " =>\n" ^ printPredicateB_aux pred2 (n+6) false ^ ")"
+  |Forall (variable,pred1,pred2) ->
+    (if left
+     then indent 0
+     else indent n) ^ "!" ^ variable ^
+      ".(" ^ printPredicateB_aux pred1 (n+3) true ^
+	" =>\n" ^ printPredicateB_aux pred2 (n+6) false ^ ")"
 
 let printPredicateB pred n = printPredicateB_aux pred n false;;
   
 let rec printLambdaOvl n func ovl = let (var,pred,value) = ovl in
-				  func ^ "\n" ^ indent n ^ "<+ %" ^ var ^ ".(\n" ^ printPredicateB pred n ^ " | " ^ value ^ ")"
+				    func ^ "\n" ^ indent n ^ "<+ %" ^ var ^ ".(\n" ^ printPredicateB pred n ^ " | " ^ value ^ ")"
 
+let rec printAffLambda varList = match varList with
+  |[] -> failwith "Bad Lambda Affectation"
+  |[var] -> var
+  |h::t -> (printAffLambda t) ^ "(" ^ h ^ ")"
+								     
 let rec printSubstitution sub n= match sub with
   |Affectation (bSet1,bSet2) -> indent n ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
   |Select [] -> failwith "it shouldn't exist"
@@ -201,11 +242,11 @@ let rec printSubstitution sub n= match sub with
   |Parallel [] -> failwith "it shouldn't appenned"
   |Parallel [t] -> printSubstitution t n ^ "\n"
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
-  |AffectationLambda (var, li) ->  indent n ^ var ^ " := " ^ List.fold_left (printLambdaOvl n) var li
-  |Call (name,parameters) -> indent n ^ name ^ begin
+  |AffectationLambda (varList, li) ->  indent n ^ printAffLambda varList ^ " := " ^ List.fold_left (printLambdaOvl n) (printAffLambda varList) li
+  |CallB (name,parameters) -> indent n ^ name ^ begin
 						 let param = printParamWithoutType parameters in
 						 if param = ""
-						 then ""
+ 						 then ""
 						 else "(" ^ param ^ ")"
 					       end
   |Any (name,pred,sub) -> indent n ^ "ANY\n" ^ indent (n+3) ^ name ^ "\n" ^
@@ -213,14 +254,14 @@ let rec printSubstitution sub n= match sub with
 			      indent n ^ "THEN\n" ^ printSubstitution sub (n+3) ^
 				indent n ^ "END\n"
 and print1SelectCase n ca = let pred,sub = ca
-			  in indent n ^ "WHEN\n" ^  (printPredicateB pred (n+3)) ^ "\n" ^  indent n ^ "THEN\n" ^ printSubstitution sub (n+3);;
+			    in indent n ^ "WHEN\n" ^  (printPredicateB pred (n+3)) ^ "\n" ^  indent n ^ "THEN\n" ^ printSubstitution sub (n+3);;
 
 let printOperation ope = indent 3 ^ ope.nameOf ^ begin
-  let param = printParam ope.parameter in
-  if param = ""
-  then ""
-  else "(" ^ param ^ ")"
-end ^ " = \n" ^ indent 3 ^  "PRE\n" ^ (printPredicateB ope.preOf 6) ^ "\n" ^ indent 3 ^ "THEN\n" ^ (printSubstitution ope.postOf 6) ^ indent 3 ^ "END";;
+						   let param = printParam ope.parameter in
+						   if param = ""
+						   then ""
+						   else "(" ^ param ^ ")"
+						 end ^ " = \n" ^ indent 3 ^  "PRE\n" ^ (printPredicateB ope.preOf 6) ^ "\n" ^ indent 3 ^ "THEN\n" ^ (printSubstitution ope.postOf 6) ^ indent 3 ^ "END";;
 
 
 
@@ -233,7 +274,7 @@ let rec printVariables var = match var with
 let rec printTypage typage = match typage with
   |[] -> ""
   |[t] -> t
-  |h::t -> h ^ " --> " ^ printTypage t;;
+  |h::t -> "(" ^ h ^ " --> " ^ printTypage t ^ ")";;
 
 let rec printInv inv = match inv with
   |[] -> ""
@@ -254,11 +295,11 @@ let rec printInit initList = match initList with
     end
   |(init)::t ->
     let initPrint =
-    begin
-      match init with
-      |AffectationInit (bSet1,bSet2) -> indent 3 ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
-      |AnyInit (var,pred,bSet1,bSet2) -> indent 3 ^ "ANY " ^ var ^ " WHERE " ^ printPredicateB pred 3 ^ " THEN "^ printBSet bSet1 ^ " := " ^ printBSet bSet2 ^ " END"
-    end in
+      begin
+	match init with
+	|AffectationInit (bSet1,bSet2) -> indent 3 ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
+	|AnyInit (var,pred,bSet1,bSet2) -> indent 3 ^ "ANY " ^ var ^ " WHERE " ^ printPredicateB pred 3 ^ " THEN "^ printBSet bSet1 ^ " := " ^ printBSet bSet2 ^ " END"
+      end in
     initPrint ^ " ||\n" ^ printInit t;;
 
 let rec printOperationList li = match li with
@@ -288,6 +329,6 @@ let rec print_machine ma =
 		  else " &\n" ^ ma.invariants.invariantsPreuve
   in
   begin
-  nameOf ^ seeString ^ includeString ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ assertionString ^ "INVARIANT\n" ^ printInv ma.invariants.typage ^ invPreuve ^ "INITIALISATION\n" ^ printInit ma.init ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
-end;;
+    nameOf ^ seeString ^ includeString ^ "\nSETS\n" ^ printSets ma.sets ^ "VARIABLES\n" ^ printVariables ma.variables ^ assertionString ^ "INVARIANT\n" ^ printInv ma.invariants.typage ^ invPreuve ^ "INITIALISATION\n" ^ printInit ma.init ^ "\nOPERATIONS\n" ^ (printOperationList ma.operations) ^ "\nEND"
+  end;;
 
