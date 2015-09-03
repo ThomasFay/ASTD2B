@@ -268,7 +268,7 @@ let rename_astd astd_to_rename namebis = match astd_to_rename with
    |QFork (a,b,c,d,e,f) -> QFork (namebis,b,c,d,e,f)
    |Fork(a,b,c,d,e) -> Fork (namebis,b,c,d,e)
    |Guard (a,b,c) -> Guard (namebis,b,c)
-   |Call (a,b,c) -> Call (namebis,b,c)
+   (*   |Call (a,b,c) -> Call (namebis,b,c)*)
    |Elem(_) -> Elem(namebis)
 ;;
 
@@ -389,7 +389,7 @@ let get_data_qsynchronisation astd = match astd with
   |_-> failwith "not appropriate data qsynch"
 
 let get_data_call astd = match astd with
-  |Call(a,b,c) -> (a,b,c)
+  (*  |Call(a,b,c) -> (a,b,c)*)
   |_-> failwith "not appropriate data call"
 
 

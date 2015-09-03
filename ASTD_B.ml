@@ -163,6 +163,11 @@ let rec printParam parameter = match parameter with
   |[param,typ] -> param
   |(param,typ)::t -> param ^ "," ^ printParam t;;
 
+let rec printParamCall parameter = match parameter with
+  |[] -> ""
+  |[param] -> param
+  |(param)::t -> param ^ "," ^ printParamCall t;;
+
 let printCart h ca = h ^ " * {" ^ ca
 
 let closeBracket h ca = h ^ "}"
@@ -244,7 +249,7 @@ let rec printSubstitution sub n= match sub with
   |Parallel (h::t) -> printSubstitution h n ^ " ||\n" ^ printSubstitution (Parallel t) n
   |AffectationLambda (varList, li) ->  indent n ^ printAffLambda varList ^ " := " ^ List.fold_left (printLambdaOvl n) (printAffLambda varList) li
   |CallB (name,parameters) -> indent n ^ name ^ begin
-						 let param = printParamWithoutType parameters in
+						 let param = printParamCall parameters in
 						 if param = ""
  						 then ""
 						 else "(" ^ param ^ ")"

@@ -12,7 +12,7 @@
 	open ASTD_arrow;;
 	open ASTD_astd;; 
 
-	let astd_parser_debug = false ;;
+	let astd_parser_debug = false;;
     let astd_parser_msg m = if (astd_parser_debug) 
                             then (print_endline m )
                             else (ignore m);;
@@ -81,7 +81,7 @@ structure:
         ASTD_astd.global_save_astd $1 [](* ;
         print_endline ("Registered: "^(ASTD_astd.get_name $1)) *)
       }
-  ;
+;
 
 
 domain_list:
@@ -252,7 +252,7 @@ arrow :
     | LPAR LPAR TO_SUB COMMA IDENTITY_NAME COMMA IDENTITY_NAME COMMA IDENTITY_NAME RPAR COMMA arrow_end RPAR
       { astd_parser_msg ("arrow tsub"); 
         let (a,b,c)= $12 in ASTD_arrow.tsub_arrow $5 $7 $9 a b c }
-    ;
+     ;
 
 
 arrow_end :
@@ -417,6 +417,7 @@ astd_guard :
     | BEGIN_ASTD GUARD SCOLON list_of_predicates SCOLON astd END_ASTD
       { ASTD_astd.guard_of (ASTD_astd.give_name ()) $4 $6  }
     ;
+
 
 
 astd_call :

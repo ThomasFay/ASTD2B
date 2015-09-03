@@ -16,7 +16,7 @@ let nocalls = ref false
 let invFile = ref ""
 let starting = ref ""
 let assertFile = ref ""
-
+let simpl = ref false
 
 let set_to_ref refInt value () = ignore ( refInt := value )
 
@@ -43,6 +43,7 @@ let arg_spec = [
   "-invFile",Arg.Set_string invFile, "If necessary, add the file that contains the invariants";
   "-starting",Arg.Set_string starting, "+ name : chose the name of the starting ASTD. Default MAIN";
   "-assertFile", Arg.Set_string assertFile, "If necessary, add the file that contain assertions";
+  "-simpl", Arg.Set simpl, "Simplify The Select substitutions"
   (* "-debug", Arg.Unit debug_on , "Activate debug output"; *)
 ]
 
@@ -134,8 +135,8 @@ let readAssertFile file place =
     Sys_error s -> ""
 
 let _ = Arg.parse arg_spec usage usage_msg;
-  let (affichage,kappa_indirect,print_final, starting_choice_possible, place_to_read, bdd, wait, debug, sFile, iFile,refine,name,sees,includes,nocalls,invFile,starting,assertFile)
-      = (!raffichage,!rkappa_indirect,!rprint_final,!rstarting_choice_possible,!rplace_to_read,!rbdd,!rwait,!rdebug,!rsFile,!riFile,!refinement,!name,!sees,!includes,!nocalls,!invFile,!starting,!assertFile)
+  let (affichage,kappa_indirect,print_final, starting_choice_possible, place_to_read, bdd, wait, debug, sFile, iFile,refine,name,sees,includes,nocalls,invFile,starting,assertFile,simpl)
+      = (!raffichage,!rkappa_indirect,!rprint_final,!rstarting_choice_possible,!rplace_to_read,!rbdd,!rwait,!rdebug,!rsFile,!riFile,!refinement,!name,!sees,!includes,!nocalls,!invFile,!starting,!assertFile,!simpl)
   in
   begin if (sFile=="") then get_structure(place_to_read) else get_structure_from_file(place_to_read^sFile) ;
 	let startingName = if starting = "" then "MAIN" else starting in
@@ -146,7 +147,16 @@ let _ = Arg.parse arg_spec usage usage_msg;
 	let
 	  nameBFile = (if (name == "") then "MachineName" else name)
 	in
-	print_endline(ASTD_translate.translate structure nameBFile refine sees includes nocalls invariants assertions)
+	print_endline(ASTD_translate.translate
+			structure
+			nameBFile
+			refine
+			sees
+			includes
+			nocalls
+			invariants
+			assertions
+			simpl)
   end
 ;;
   

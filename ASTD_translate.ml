@@ -166,7 +166,9 @@ let rec initializeAllVariable nameOfState astd =
   |QFork(name,_,set,_,_,subAstd) ->
     let initSub = initializeAllVariable (get_name subAstd) astd in
     List.rev_map (quantifyOneInitAllVar set) initSub
-
+  |Call(name,subAstdName,_) ->
+    (Affectation (Variable ("State_" ^ name),
+		  Constant "notCalled"))::initializeAllVariable subAstdName astd
 (*
   This operation returns the last element of a list
   Arguments :
@@ -362,8 +364,10 @@ let rec final astd listVar = match astd with
 		      dFinalStateCond dFinal astd listVar)
       |t1::q1,t2::q2 -> (Or(In(Variable ("State_" ^ name),
 			       EnumerateSet sFinal),
-			    In(Variable ("State_"^name),
-			       EnumerateSet dFinal)))
+			    (And (In(Variable ("State_"^name),
+				     EnumerateSet dFinal),
+				  dFinalStateCond dFinal astd listVar))))			    
+			      
     end
   |Fork (name,_,predicate_list,astdRight,astdLeft) ->
     Implies(translatePredicateList predicate_list,
@@ -934,8 +938,10 @@ let rec getName var = match var with
 
 let rec casePredicate sub = match sub with
   |Select li -> casePredicateSelect li
-  |Affectation (bSet1,bSet2) -> [(getName bSet1,True,sub)]
+  |Affectation (bSet1,bSet2) -> [([getName bSet1],True,sub)]
   |Parallel li -> casePredicatePara li
+  |AffectationLambda(var1,set) -> [var1,True,sub]
+  |_ -> failwith "Fail Case Predicate"
 and casePredicateSelect li = match li with
   |[] -> []
   |(pred,sub)::t -> (List.rev_map (andPred pred) (casePredicate sub)) @ (casePredicateSelect t)
@@ -943,12 +949,20 @@ and casePredicatePara li = match li with
   |[] -> []
   |h::t -> casePredicate h @ casePredicatePara t
 
+(*
+ This operation is used to regroup the variables. casePList is a list of list. Each element of the list contains all the cases where one variable is modified
+ Arguments:
+ - case : One modification case (a tuple (variable, predicate, elementary substitution))
+ - casePList : A list of list of modification cases
+ *)
+					       
 let rec addVarPreAffect case casePList = match casePList with
   |[] -> [case]::[]
   |(h::t)::st -> let (varC,predC,affC) = case and
 		     (varH,predH,affH) = h in
 		 if varH = varC then (case::h::t)::st
 		 else (h::t)::(addVarPreAffect case st)
+  |[]::_ -> failwith "Shouldn't add empty List"
 
 let rec regroupByVariable caseP = match caseP with
   |[] -> []
@@ -960,9 +974,13 @@ let makeOvl varQ domainQ case ovl =
   match affect with
   |Affectation (bSet1,bSet2) ->
     begin
+      let cond= match pred with
+	|True -> In (Constant varQ,Constant domainQ)
+	|_ -> And (In (Constant varQ,Constant domainQ),pred)
+      in
       match bSet2 with
-      |Variable st -> (varO,(varQ,And (In (Constant varQ,Constant domainQ),pred),st)::li)
-      |Constant st -> (varO,(varQ,And (In (Constant varQ,Constant domainQ),pred),st)::li)
+      |Variable st -> (varO,(varQ,cond,st)::li)
+      |Constant st -> (varO,(varQ,cond,st)::li)
       |_ -> failwith "bad Affectation"
     end
   |_ -> failwith "badSub"
@@ -974,11 +992,12 @@ let getVar caseP = match caseP with
 let makeOneOvl varQ domainQ caseP =
   let varA = getVar caseP in
   let (var,li) = (List.fold_right (makeOvl varQ domainQ) caseP (varA,[])) in
-  AffectationLambda ([var],li)
+  AffectationLambda (var,li)
 
 let rec quantifyPostQSync var domain sub = match sub with
   |AffectationLambda (var1,li) -> AffectationLambda (var1,List.rev_map (quantifyLambdaAff var) li)
   |Parallel li -> Parallel (List.rev_map (quantifyPostQSync var domain) li)
+  |_ -> failwith "An operation translated for QSync only contains AffectationLambda and Parallel"
 
 		    
 let modifyPostOfForQSync post var domain =
@@ -993,10 +1012,14 @@ let makeOvlQFork varQ domainQ predicate case ovl =
   let (varO,li) = ovl in
   match affect with
   |Affectation (bSet1,bSet2) ->
+    let cond = match pred with
+      |True -> And (In (Constant varQ, Constant domainQ),predicate)
+      |_ -> And (In (Constant varQ,Constant domainQ),And(predicate,pred))
+    in
     begin
       match bSet2 with
-      |Variable st -> (varO,(varQ,And (In (Constant varQ,Constant domainQ),And(predicate,pred)),st)::li)
-      |Constant st -> (varO,(varQ,And (In (Constant varQ,Constant domainQ),And(predicate,pred)),st)::li)
+      |Variable st -> (varO,(varQ,cond,st)::li)
+      |Constant st -> (varO,(varQ,cond,st)::li)
       |_ -> failwith "bad Affectation"
     end
   |_ -> failwith "badSub"
@@ -1004,7 +1027,7 @@ let makeOvlQFork varQ domainQ predicate case ovl =
 let makeOneOvlQFork varQ domainQ predicate caseP = 
   let varA = getVar caseP in
   let (var,li) = (List.fold_right (makeOvlQFork varQ domainQ predicate) caseP (varA,[])) in
-  AffectationLambda ([var],li)
+  AffectationLambda (var,li)
 
 let modifyPostOfForQFork post var domain predicate =
   quantifyPostQSync var domain (Parallel (List.rev_map (makeOneOvlQFork var domain predicate) (regroupByVariable (casePredicate post))))
@@ -1088,6 +1111,7 @@ let quantifiedInit domain init = match init with
 	|Function _ -> failwith "initialisation with a function"
 	|EnumerateSet _ -> failwith "initialisation with an enumerate set"
 	|CartesianP li -> CartesianP (domain::li)
+	|QVar _ -> failwith "initialisation with a quantification variable"
       end
     in
     AffectationInit(bSet1,newbSet2)
@@ -1100,6 +1124,7 @@ let quantifiedInit domain init = match init with
 	|Function _ -> failwith "initialisation with a function"
 	|EnumerateSet _ -> failwith "initialisation with an enumerate set"
 	|CartesianP li -> CartesianP (domain::li)
+	|QVar _ -> failwith "initialisation with a quantification variable"
       end
     in AnyInit (str,pred,bSet1,newbSet2)
 
@@ -1130,57 +1155,74 @@ let rec setListFusion listSet1 listSet2 = match listSet1 with
   |[] -> listSet2
   |(nameOfSet,valuesOfSet)::t -> setListFusion t (addEnumerateSetToSetList nameOfSet valuesOfSet listSet2)
 
-let rec translate_aux astd = match astd with
+let rec simpl_sub sub = match sub with
+  |Select [gu,act] -> simpl_sub act
+  |_ -> sub;;
+
+let simpl simplOn op = match op with
+  |name,operation ->
+    (name,{nameOf = operation.nameOf;
+	   parameter = operation.parameter;
+	   preOf = operation.preOf;
+	   postOf = if simplOn
+		    then simpl_sub operation.postOf
+		    else operation.postOf;})
+					       
+let rec translate_aux simplOn astd = match astd with
   |Elem _ -> ([],[],[])
   |Automata(name,state_list,transition_list,shallowFinal_list,deepFinal_list,initialState) ->
-    let setList,varList,opeList = translateStateList state_list name in
+    let setList,varList,opeList = translateStateList simplOn state_list name in
     let opeListNew = addOperationFromTransitionList astd transition_list opeList varList in
-    setList,
-    ("State_"^ name,
-     ["AutState_" ^ name],
-     AffectationInit (Variable ("State_" ^ name),
-		      Constant initialState))::varList,
-    opeListNew
+    (setList,
+     ("State_"^ name,
+      ["AutState_" ^ name],
+       AffectationInit (Variable ("State_" ^ name),
+			Constant initialState))::varList,
+      List.rev_map (simpl simplOn) opeListNew)
   |Sequence (name,astdFst,astdSnd) ->
-    let setListFst,varListFst,opeListFst = translate_aux astdFst in
-    let setListSnd,varListSnd,opeListSnd = translate_aux astdSnd in
+    let setListFst,varListFst,opeListFst = translate_aux simplOn astdFst in
+    let setListSnd,varListSnd,opeListSnd = translate_aux simplOn astdSnd in
     ((addEnumerateSetToSetList "SequenceState" ["fst";"snd"] (setListSnd@setListFst)),
      ("State_"^name,
       ["SequenceState"],
       AffectationInit (Variable ("State_" ^ name),
 		       Constant "fst"))::(varListFst@varListSnd),
-     (modifyOperationForSequence opeListFst opeListSnd name astdFst (varListFst@varListSnd)))
+     List.rev_map (simpl simplOn)
+		  (modifyOperationForSequence opeListFst opeListSnd name astdFst (varListFst@varListSnd)))
   |Choice (name,astdLeft,astdRight) ->
-    let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
-	setListRight,varListRight,opeListRight = translate_aux astdRight in
+    let setListLeft,varListLeft,opeListLeft = translate_aux simplOn astdLeft and
+	setListRight,varListRight,opeListRight = translate_aux simplOn astdRight in
     ((addEnumerateSetToSetList "ChoiceState" ["rightS";"leftS";"none"] (setListFusion setListLeft setListRight)),
      ("State_"^name,
       ["ChoiceState"],
       AffectationInit (Variable ("State_" ^ name),
 		       Constant "none"))::(varListRight@varListLeft),
-     modifyOperationForChoice opeListLeft opeListRight name astdLeft (varListLeft@varListRight))
+     List.rev_map (simpl simplOn)
+		  (modifyOperationForChoice opeListLeft opeListRight name astdLeft (varListLeft@varListRight)))
   |Kleene (name,subAstd) ->
-    let setList,varList,opeList = translate_aux subAstd in
+    let setList,varList,opeList = translate_aux simplOn subAstd in
     (addEnumerateSetToSetList "KleeneState" ["started";"notStarted"] setList,
      ("State_" ^ name,
       ["KleeneState"],
       AffectationInit (Variable ("State_" ^ name),
 		       Constant "notStarted"))::varList,
-     List.rev_map (modifyOperationForKleene name subAstd varList) opeList)
+     List.rev_map (simpl simplOn) (List.rev_map (modifyOperationForKleene name subAstd varList) opeList))
   |Synchronisation (name,syncList,astdLeft,astdRight) ->
-    let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
-	setListRight,varListRight,opeListRight = translate_aux astdRight in
+    let setListLeft,varListLeft,opeListLeft = translate_aux simplOn astdLeft and
+	setListRight,varListRight,opeListRight = translate_aux simplOn astdRight in
     (setListFusion setListRight setListLeft,
      varListRight@varListLeft,
-     modifyOperationsForSynchro opeListRight opeListLeft syncList name)
+     List.rev_map (simpl simplOn)
+		  (modifyOperationsForSynchro opeListRight opeListLeft syncList name))
   |Fork (name,syncList,predicate_list,astdLeft,astdRight) ->
-    let setListLeft,varListLeft,opeListLeft = translate_aux astdLeft and
-	setListRight,varListRight,opeListRight = translate_aux astdRight in
+    let setListLeft,varListLeft,opeListLeft = translate_aux simplOn astdLeft and
+	setListRight,varListRight,opeListRight = translate_aux simplOn astdRight in
     (setListFusion setListRight setListLeft,
      varListRight@varListLeft,
-     modifyOperationsForFork opeListRight opeListLeft syncList name (translatePredicateList predicate_list))
+     List.rev_map (simpl simplOn)
+		  (modifyOperationsForFork opeListRight opeListLeft syncList name (translatePredicateList predicate_list)))
   |QChoice (name,var,domain,subAstd) ->
-    let setList,varList,opeList = translate_aux subAstd in
+    let setList,varList,opeList = translate_aux simplOn subAstd in
     (addEnumerateSetToSetList domain [] (addEnumerateSetToSetList "QChoiceSet" ["chosen";"notChosen"] setList),
      (("State_" ^ name,
        ["QChoiceSet"],
@@ -1194,29 +1236,33 @@ let rec translate_aux astd = match astd with
 		  Variable ("Value_" ^ name),
 		  Variable "xx"))::
 	  varList),
-     List.rev_map (modifyOperationForQChoice name var varList) opeList)
+     List.rev_map (simpl simplOn)
+		  (List.rev_map (modifyOperationForQChoice name var varList) opeList))
   |QSynchronisation(name,var,domain,syncSetList,subAstd) ->
-    let setList,varList,opeList = translate_aux subAstd in
+    let setList,varList,opeList = translate_aux simplOn subAstd in
     (setList,
      List.rev_map (quantifiedVariableInVarList domain) varList,
-     List.rev_map (modifyOperationForQSync syncSetList var domain) opeList)
+     List.rev_map (simpl simplOn)
+		  (List.rev_map (modifyOperationForQSync syncSetList var domain) opeList))
   |QFork(name,var,domain,predicate_list,synchSetList,subAstd) ->
-    let setList,varList,opeList = translate_aux subAstd in
+    let setList,varList,opeList = translate_aux simplOn subAstd in
     (setList,
      List.rev_map (quantifiedVariableInVarList domain) varList,
-     List.rev_map (modifyOperationForQFork synchSetList var domain predicate_list) opeList)
+     List.rev_map (simpl simplOn)
+		  (List.rev_map (modifyOperationForQFork synchSetList var domain predicate_list) opeList))
   |Guard(name,predicateList,subAstd) ->
-    let setList,varList,opeList = translate_aux subAstd in
+    let setList,varList,opeList = translate_aux simplOn subAstd in
     (addEnumerateSetToSetList "guardState" ["checked";"notChecked"] setList,
      ("State_" ^ name,
       ["guardState"],
       AffectationInit (Variable ("State_" ^ name),
 		       Constant "notChecked"))
      ::varList,
-     List.rev_map (modifyOperationForGuard (translatePredicateList predicateList) name varList) opeList)
-and translateStateList stateList nameTranslatedAstd = match stateList with
-  |h::t -> let (setListOfH,varListOfH,opeListOfH) = translate_aux h in
-	   let (setListOfT,varListOfT,opeListOfT) = translateStateList t nameTranslatedAstd
+     List.rev_map (simpl simplOn)
+		  (List.rev_map (modifyOperationForGuard (translatePredicateList predicateList) name varList) opeList))
+and translateStateList simplOn stateList nameTranslatedAstd = match stateList with
+  |h::t -> let (setListOfH,varListOfH,opeListOfH) = translate_aux simplOn h in
+	   let (setListOfT,varListOfT,opeListOfT) = translateStateList simplOn t nameTranslatedAstd
 	   in ((addStateToStateList (get_name h) nameTranslatedAstd (setListOfH@setListOfT)),varListOfH@varListOfT,opeListOfT@opeListOfH)
   |[] -> ([],[],[]);;
 
@@ -1254,8 +1300,8 @@ let finalizeOpe nocalls op =
        end;
   }
 
-let translate astd name refine sees includes nocalls inv ass =
-  let setsList,varList,opeList = translate_aux astd in
+let translate astd name refine sees includes nocalls inv ass simpl =
+  let setsList,varList,opeList = translate_aux simpl astd in
   let variables,invariants,initialisation=getInfoFromVarList varList in
   let machine = {machine = if refine="" then Machine name else (Refinement (name,refine));
 		 sees = if sees="" then NoSeenMachine else SeenMachine sees;
