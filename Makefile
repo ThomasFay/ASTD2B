@@ -29,6 +29,7 @@ BASE = functions \
 	ASTD_astd \
 	ASTD_translate \
 	ASTD_state \
+	ASTD_minimize
 
 
 PARSER = ASTD_parser
