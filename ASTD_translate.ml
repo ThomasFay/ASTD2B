@@ -214,12 +214,18 @@ let rec initValueOfVar listVar var1 =
       end
     else initValueOfVar t (Variable name)
 
+let rec inStringList str li = match li with
+  |[] -> false
+  |he::ta -> he = str || inStringList str ta
+
 (*
   This function correpond to the [init] operation of the translation (see the article with the translation rules). It replaces all the variable by their initial values. The initPredSimpl simplifies the predicate, which means that the x=y are replaced by False and x=x are replaced by False.
   Arguments :
   - pred : The predicate we want to "init"
   - listVar : The variable list as calculated in the translate function. It is used to find the initial value of the variable
  *)
+
+
 			
 let rec initPred pred listVar = match pred with
   |And (pred1,pred2) ->
@@ -254,9 +260,24 @@ let rec initPred pred listVar = match pred with
       with
       | InitIsAny pred -> pred
     end
-  |In (var1,val1) -> In (Constant (initValueOfVar listVar var1), val1)
+  |In (var1,set1) ->
+    let val1 = initValueOfVar listVar var1 in
+    begin
+      match set1 with
+      |EnumerateSet li -> if inStringList val1 li then True else False
+      |_ -> In (Constant val1, set1)
+    end
   |True -> True
-  |Implies (pred1,pred2) -> Implies (initPred pred1 listVar,initPred pred2 listVar)
+  |Implies (pred1,pred2) ->
+    let initPred1 = initPred pred1 listVar and
+	initPred2 = initPred pred2 listVar in
+    begin
+      match (initPred1,initPred2) with
+      |False,_ -> True
+      |_,True -> True
+      |True,_ -> initPred2
+      |_ ,_ -> Implies (initPred1,initPred2)
+    end
   |False -> False
   |Exists(var,predicate) -> 
     let initPredicate = initPred predicate listVar in
@@ -373,10 +394,25 @@ let rec final astd listVar = match astd with
     Implies(translatePredicateList predicate_list,
 	    And (final astdRight listVar,
 		 final astdLeft listVar))
-  |Sequence (name,astdFst,astdSnd) -> And (final astdSnd listVar,
-					   Implies (Equality (Variable ("State_" ^ name),
-							      Constant "fst"),
-						    final astdFst listVar))
+  |Sequence (name,astdFst,astdSnd) ->
+    let initFinal2 = initPred (final astdSnd listVar) listVar in
+    begin
+      match initFinal2 with
+      |False -> And (Equality (Variable ("State_" ^ name),
+			       Constant "snd"),
+		     final astdSnd listVar)
+      |True ->  Or (And (Equality (Variable ("State_" ^ name),
+			       Constant "snd"),
+			 final astdSnd listVar),
+		    Equality (Variable ("State_" ^ name),
+			      Constant "fst"))
+      |_ -> Or (And (Equality (Variable ("State_" ^ name),
+			       Constant "snd"),
+		     final astdSnd listVar),
+		And (Equality (Variable ("State_" ^ name),
+			       Constant "fst"),
+		     initFinal2))
+    end
   |Choice(name,astdLeft,astdRight) -> 
     And (Implies (Equality (Variable ("State_" ^ name),
 			    Constant "none"),
@@ -605,46 +641,70 @@ let rec addOperationFromTransitionList astd transition_list opeList listVar = ma
 
 
 let createPrePostSeq lOpeFst lOpeSnd name astdFst varList= match (lOpeFst,lOpeSnd) with
-  |_,h1::h2::t -> failwith "Shouln't Happend"
-  |h1::h2::t,_ -> failwith "Shouln't Happend"
-  |[],[] -> failwith "Shouldn't Happend"
+  |_,h1::h2::t -> failwith "Translation problem : The operation apears twice in the second part of the sequence"
+  |h1::h2::t,_ -> failwith "Translation problem : The operation apears twice in the first part of the sequence"
+  |[],[] -> failwith "Shouldn't Happend12"
   |[(nameFst,opeFst)],[] ->
     let pre1 = (And (Equality (Variable ("State_" ^ name), 
 			       Variable "fst"), 
 		     opeFst.preOf )) in
     (pre1,
      Select [(pre1,opeFst.postOf)])
-  |[nameFst,opeFst],[nameSnd,opeSnd] -> 
-    let pre1,pre2,pre3 = (And (Equality (Variable ("State_" ^ name), 
+  |[nameFst,opeFst],[nameSnd,opeSnd] ->
+    let pre2 = let initPred1 = initPred opeSnd.preOf varList in
+	       begin
+		 match initPred1 with
+		 |False -> False
+		 |True -> And (Equality (Variable ("State_" ^ name),
+					 Variable "fst"),
+			       final astdFst varList)
+		 |_ -> And (Equality (Variable ("State_" ^ name),
+				      Variable "fst"),
+			    And (final astdFst varList,initPred1))
+	       end in
+    let pre1,pre3 = (And (Equality (Variable ("State_" ^ name), 
 					 Variable "fst"), 
 			       opeFst.preOf ),
 			  And (Equality (Variable ("State_" ^ name),
 					 Variable "snd"),
-			       And (final astdFst varList,initPred opeSnd.preOf varList)), 
-			  And (Equality (Variable ("State_" ^ name),
-					 Variable "snd"),
 			       opeSnd.preOf))
     in
-    (Or(Or (pre1,pre2),pre3),
-     Select [(pre1,opeFst.postOf);
-	     (pre2,Parallel [(Affectation (Variable ("State_" ^ name),
-					   Constant "snd"));
-			     initSub varList (opeSnd.postOf)]);
-	     (pre3,opeSnd.postOf)])
+    begin
+      match (pre1,pre2,pre3) with
+	     |_,False,_ -> (Or (pre1,pre3),
+			    Select [(pre1,opeFst.postOf);(pre3,opeSnd.postOf)])
+	     |_,_,_ -> (Or(Or (pre1,pre2),pre3),
+			Select [(pre1,opeFst.postOf);
+				(pre2,Parallel [(Affectation (Variable ("State_" ^ name),
+							      Constant "snd"));
+						initSub varList (opeSnd.postOf)]);
+				(pre3,opeSnd.postOf)])
+    end
   |[],[nameSnd,opeSnd] ->
-    let pre2,pre3 = (
+    let pre2 = let initPred1 = initPred opeSnd.preOf varList in
+	       begin
+		 match initPred1 with
+		 |False -> False
+		 |True -> And (Equality (Variable ("State_" ^ name),
+					 Variable "fst"),
+			       final astdFst varList)
+		 |_ -> And (Equality (Variable ("State_" ^ name),
+				      Variable "fst"),
+			    And (final astdFst varList,initPred1))
+	       end in
+    let pre3 = 
       And (Equality (Variable ("State_" ^ name),
 		     Variable "snd"),
-	   And (final astdFst varList,initPred opeSnd.preOf varList)), 
-      And (Equality (Variable ("State_" ^ name),
-		     Variable "snd"),
-	   opeSnd.preOf))
+	   opeSnd.preOf)
     in
-    (Or(pre2,pre3),
-     Select [(pre2,Parallel [(Affectation (Variable ("State_" ^ name),
-					   Constant "snd"));
-			     initSub varList (opeSnd.postOf)]);
-	     (pre3,opeSnd.postOf)])
+    begin match (pre2,pre3) with
+	  |False,_ -> pre3,Select [(pre3,opeSnd.postOf)]
+	  |_,_ -> (Or(pre2,pre3),
+		   Select [(pre2,Parallel [(Affectation (Variable ("State_" ^ name),
+							 Constant "snd"));
+					   initSub varList (opeSnd.postOf)]);
+			   (pre3,opeSnd.postOf)])
+    end
 
 let rec modifyOperationForSequence listFst listSnd name astdFst varList = match (listFst,listSnd) with
   |[],[] -> []
@@ -799,12 +859,12 @@ let rec isInSyncSet name syncList = match syncList with
   |h::t -> (h = name) || isInSyncSet name t;;
 
 let createPrePostSync listLeft listRight syncList = match (listLeft,listRight) with
-  |[],_ -> failwith "Shouldn't Happend"
-  |h1::h2::t,_ -> failwith "Shouldn't Happend"
-  |_,h1::h2::t -> failwith "Shouldn't Happend"
+  |[],_ -> failwith "toto1"
+  |h1::h2::t,_ -> failwith "toto2"
+  |_,h1::h2::t -> failwith "toto3"
   |[(nameLeft,opeLeft)],[] -> 
     if isInSyncSet opeLeft.nameOf syncList then
-      failwith "Shouldn't Happend"
+      failwith "Shouldn't Happend4"
     else (opeLeft.preOf, Select ([(opeLeft.preOf,opeLeft.postOf)]))
   |[(nameLeft,opeLeft)],[(nameRight,opeRight)] ->
     if isInSyncSet opeLeft.nameOf syncList then

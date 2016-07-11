@@ -1,3 +1,5 @@
+exception EmptySelect
+
 type bSet =
     Variable of string
    | QVar of string
@@ -241,7 +243,7 @@ let rec printAffLambda varList = match varList with
 								     
 let rec printSubstitution sub n= match sub with
   |Affectation (bSet1,bSet2) -> indent n ^ printBSet bSet1 ^ " := " ^ printBSet bSet2
-  |Select [] -> failwith "it shouldn't exist"
+  |Select [] -> raise EmptySelect
   |Select [(pred,sub)] -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+3) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+3) ^ indent n ^ "END\n"
   |Select ((pred,sub)::t) -> indent n ^ "SELECT\n" ^ printPredicateB pred (n+3) ^ "\n" ^ indent n ^ "THEN\n" ^ printSubstitution sub (n+3) ^ printStringList (List.rev_map (print1SelectCase n) t) ^ indent n ^ "END\n"
   |Parallel [] -> failwith "it shouldn't appenned"
@@ -266,7 +268,8 @@ let printOperation ope = indent 3 ^ ope.nameOf ^ begin
 						   if param = ""
 						   then ""
 						   else "(" ^ param ^ ")"
-						 end ^ " = \n" ^ indent 3 ^  "PRE\n" ^ (printPredicateB ope.preOf 6) ^ "\n" ^ indent 3 ^ "THEN\n" ^ (printSubstitution ope.postOf 6) ^ indent 3 ^ "END";;
+						 end ^ " = \n" ^ indent 3 ^  "PRE\n" ^ (printPredicateB ope.preOf 6) ^ "\n" ^ indent 3 ^ "THEN\n" ^
+			   (try (printSubstitution ope.postOf 6) with |EmptySelect -> let errorMessage = "Empty Select in " ^ ope.nameOf in failwith errorMessage) ^ indent 3 ^ "END";;
 
 
 
