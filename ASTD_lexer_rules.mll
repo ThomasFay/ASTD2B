@@ -15,7 +15,7 @@ let digits = ['0'-'9']
 let id = "Id"
 let underscore='_'
 let quote='"'
-let bchar = "<+" | "<|" | "<<|" | "|>" | "|>>" | ":" | "<:" | "=" | " " | "(" | ")" | "{" | "}" | "," | "$" | "/" | underscore
+let bchar = "<+" | "<|" | "<<|" | "|>" | "|>>" | ":" | "<:" | "=" | " " | "(" | ")" | "{" | "}" | "," | "$" | "/" | underscore | "&"
 
 
 rule token = parse

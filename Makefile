@@ -27,8 +27,8 @@ BASE = functions \
 	ASTD_B \
 	ASTD_optimisation \
 	ASTD_astd \
-	ASTD_minimize \
 	ASTD_translate \
+	ASTD_minimize \
 	ASTD_state
 
 
@@ -155,3 +155,4 @@ types_dependencies.dot : $(TARGET)
 
 include .depend
 
+.PRECIOUS: %.cmi

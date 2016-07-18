@@ -937,9 +937,16 @@ let rec modifyOperationsForFork opeListLeft opeListRight syncSet name predicate 
 
 let modifyOperationForQChoice name var listVar operation = 
   let nameSubAstd,ope = operation in
-  let pre1 = And (Equality (Variable ("State_" ^ name),
-			    Constant "notChosen"),
-		  initPred (ope.preOf) listVar)
+  let pre1 =
+    begin
+      match initPred (ope.preOf) listVar with
+      |True -> Equality (Variable ("State_" ^ name),
+			    Constant "notChosen")
+      |False -> False
+      |pred -> And (Equality (Variable ("State_" ^ name),
+			      Constant "notChosen"),
+		    pred)
+    end
     and
       post1 = Parallel [Affectation (Variable ("State_" ^ name),
 				     Constant "chosen");
@@ -955,12 +962,19 @@ let modifyOperationForQChoice name var listVar operation =
     and
       post2 = ope.postOf
   in
-  let modifiedPreOf = Or (pre1,pre2)
-  and modifiedPostOf = Select [(pre1,post1);(pre2,post2)] in
-  (nameSubAstd,{nameOf = ope.nameOf;
-		parameter = ope.parameter;
-		preOf = modifiedPreOf;
-		postOf = modifiedPostOf})
+  begin
+    match pre1 with
+    |False ->
+      (nameSubAstd,{nameOf = ope.nameOf;
+		    parameter = ope.parameter;
+		    preOf = pre2;
+		    postOf = Select[(pre2,post2)]})
+    |_ ->
+      (nameSubAstd,{nameOf = ope.nameOf;
+		    parameter = ope.parameter;
+		    preOf = Or (pre1,pre2);
+		    postOf = Select [(pre1,post1);(pre2,post2)]})
+  end;;
 
 let quantifyLambdaAff var ovl = let (str1,pred,str2)=ovl in (str1,predMap (quantifiedVariable var) pred,str2)
 
